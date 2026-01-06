@@ -47,6 +47,13 @@ func main() {
 		json.NewEncoder(w).Encode(users)
 	})
 
+	// r.Get("/events", func(w http.ResponseWriter, r *http.Request) {
+	// 	ctx, cancel := context.WithTimeout(r.Context(), 5 * time.Second)
+	// 	defer cancel()
+
+	// 	events, err := db.
+	// })
+
 	server := &http.Server {
 		Addr : ":8080",
 		Handler: r,
