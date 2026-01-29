@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/http/handlers"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 )
@@ -24,6 +25,8 @@ func main() {
 	defer dbPool.Close()
 
 	log.Println("connected")
+
+	eventsHandler := &handlers.EventsHandler{DB: dbPool}
 
 	r := chi.NewRouter()
 
@@ -47,12 +50,22 @@ func main() {
 		json.NewEncoder(w).Encode(users)
 	})
 
-	// r.Get("/events", func(w http.ResponseWriter, r *http.Request) {
-	// 	ctx, cancel := context.WithTimeout(r.Context(), 5 * time.Second)
-	// 	defer cancel()
+	r.Get("/events", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5 * time.Second)
+		defer cancel()
 
-	// 	events, err := db.
-	// })
+		events, err := db.GetEvents(ctx, dbPool)
+
+		if err != nil {
+			http.Error(w, "failed to fetch events", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(events)
+	})
+
+	r.Post("/events", eventsHandler.CreateEvent)
 
 	server := &http.Server {
 		Addr : ":8080",
