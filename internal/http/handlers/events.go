@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -115,4 +116,90 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
+}
+
+func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+
+	q := r.URL.Query()
+
+	var hostUserID *uuid.UUID
+	if v := q.Get("host_user_id"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(w, "invalid host_user_id", http.StatusBadRequest)
+			return
+		}
+		hostUserID = &id
+	}
+
+	var pageID *uuid.UUID
+	if v := q.Get("page_id"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(w, "invalid page_id", http.StatusBadRequest)
+			return
+		}
+		pageID = &id
+	}
+
+	var from *time.Time
+	if v := q.Get("from"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, "invalid from (use RFC3339)", http.StatusBadRequest)
+			return
+		}
+		from = &t
+	}
+
+	var to *time.Time
+	if v := q.Get("to"); v != "" {
+		t, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			http.Error(w, "invalid to (use RFC3339)", http.StatusBadRequest)
+			return
+		}
+		to = &t
+	}
+
+	limit := 20
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			http.Error(w, "invalid limit", http.StatusBadRequest)
+			return
+		}
+		limit = n
+	}
+
+	offset := 0
+	if v := q.Get("offset"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			http.Error(w, "invalid offset", http.StatusBadRequest)
+			return
+		}
+		offset = n
+	}
+
+	events, err := db.GetEvents(ctx, h.DB, db.GetEventParams{
+		HostUserID: hostUserID,
+		PageID: pageID,
+		From: from,
+		To: to,
+		Limit: limit,
+		Offset: offset,
+	})
+	if err != nil {
+		http.Error(w, "failed to fetch events", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"events": events,
+		"count": len(events),
+	})
 }

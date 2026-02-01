@@ -2,10 +2,10 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,29 +23,82 @@ type Event struct {
 	CreatedAt  time.Time  `json:"created_at"`
 }
 
-func GetEvents (ctx context.Context, pool *pgxpool.Pool) ([]Event, error) {
-	rows, err := pool.Query(ctx, `SELECT id, host_user_id, host_page_id, title, description, location, event_start, event_end, price, capacity FROM events ORDER BY created_at DESC`)
+type GetEventParams struct {
+	HostUserID *uuid.UUID
+	PageID *uuid.UUID
+	From *time.Time
+	To *time.Time
+	Limit int
+	Offset int
+}
 
+func GetEvents (ctx context.Context, pool *pgxpool.Pool, p GetEventParams) ([]Event, error) {
+	if p.Limit <= 0 {
+		p.Limit = 20
+	} else if p.Limit > 100 {
+		p.Limit = 100
+	}
+
+	query := `SELECT id, host_user_id, host_page_id, title, description, location, event_start, event_end, price, capacity, created_at FROM events WHERE 1=1`
+
+	args := []any{}
+	argN := 1
+
+	if p.HostUserID != nil {
+		query += " AND host_user_id = $" + itoa(argN)
+		args = append(args, *p.HostUserID)
+		argN++
+	}
+	if p.PageID != nil {
+		query += " AND host_page_id = $" + itoa(argN)
+		args = append(args, *p.PageID)
+		argN++
+	}
+	if p.From != nil {
+		query += " AND event_start >= $" + itoa(argN)
+		args = append(args, *p.From)
+		argN++
+	}
+	if p.To != nil {
+		query += " AND event_start <= $" + itoa(argN)
+		args = append(args, *p.To)
+		argN++
+	}
+
+	query += " ORDER BY event_start ASC"
+	query += " LIMIT $" + itoa(argN)
+	args = append(args, p.Limit)
+	argN++
+
+	query += " OFFSET $" + itoa(argN)
+	args = append(args, p.Offset)
+	argN++
+
+	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var events []Event
+	events := make([]Event, 0, p.Limit)
 
 	for rows.Next() {
-		var u Event
+		var e Event
 
-		if err := rows.Scan(&u.ID, &u.HostUserID, &u.HostPageID, &u.Title, &u.Description, &u.Location, &u.EventStart, &u.EventEnd, &u.Price, &u.Capacity); err != nil {
+		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 
-		events = append(events, u)
+		events = append(events, e)
 
 	}
 
 	return events, nil
 
+}
+
+func itoa(i int) string {
+	return fmt.Sprintf("%d", i)
 }
 
 func CreateEvent (ctx context.Context, pool *pgxpool.Pool, e Event) (*Event, error) {
