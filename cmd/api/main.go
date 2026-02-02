@@ -9,6 +9,7 @@ import (
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/handlers"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 )
@@ -26,13 +27,24 @@ func main() {
 
 	log.Println("connected")
 
+	authHandler := &handlers.AuthHandler{DB: dbPool}
 	eventsHandler := &handlers.EventsHandler{DB: dbPool}
 
 	r := chi.NewRouter()
 
+	r.Post("/auth/request-otp", authHandler.RequestOTP)
+	r.Post("/auth/verify-otp", authHandler.VerifyOTP)
+
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
+	})
+
+	r.Group(func(protected chi.Router) {
+		protected.Use(middleware.AuthMiddleware)
+
+		protected.Post("/events", eventsHandler.CreateEvent)
+		protected.Get("/events", eventsHandler.GetEvents)
 	})
 
 	r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +63,6 @@ func main() {
 	})
 
 	r.Get("/events", eventsHandler.GetEvents)
-
 	r.Post("/events", eventsHandler.CreateEvent)
 
 	server := &http.Server {
