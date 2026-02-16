@@ -63,7 +63,6 @@ func main() {
 	})
 
 	r.Get("/events", eventsHandler.GetEvents)
-	r.Post("/events", eventsHandler.CreateEvent)
 
 	server := &http.Server {
 		Addr : ":8080",

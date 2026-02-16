@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
 )
 
 type EventsHandler struct {
@@ -34,6 +35,23 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 
 	defer cancel()
 
+	userIDVal := r.Context().Value(middleware.UserIDKey)
+	if userIDVal == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	userID, ok := userIDVal.(string)
+	if !ok {
+		http.Error(w, "invalid auth context", http.StatusUnauthorized)
+		return
+	}
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusUnauthorized)
+		return
+	}
+
 	var req CreateEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid json body", http.StatusBadRequest)
@@ -48,31 +66,27 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "event_start is required", http.StatusBadRequest)
 		return
 	}
-	if req.HostUserID == nil && req.HostPageID == nil {
-		http.Error(w, "host_user_id or host_page_id is required", http.StatusBadRequest)
-		return
-	}
 
-	var hostUserID *uuid.UUID
-	if req.HostUserID != nil {
-		id, err := uuid.Parse(*req.HostUserID)
+	// var hostUserID *uuid.UUID
+	// if req.HostUserID != nil {
+	// 	id, err := uuid.Parse(*req.HostUserID)
 
-		if err != nil {
-			http.Error(w, "invalid user id", http.StatusBadRequest)
-			return
-		}
-		hostUserID = &id
-	}
+	// 	if err != nil {
+	// 		http.Error(w, "invalid user id", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// 	hostUserID = &id
+	// }
 
-	var hostPageID *uuid.UUID
-	if req.HostPageID != nil {
-		id, err := uuid.Parse(*req.HostPageID)
-		if err != nil {
-			http.Error(w, "invalid host_page_id", http.StatusBadRequest)
-			return
-		}
-		hostPageID = &id
-	}
+	// var hostPageID *uuid.UUID
+	// if req.HostPageID != nil {
+	// 	id, err := uuid.Parse(*req.HostPageID)
+	// 	if err != nil {
+	// 		http.Error(w, "invalid host_page_id", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// 	hostPageID = &id
+	// }
 
 	start, err := time.Parse(time.RFC3339, req.EventStart)
 	if err != nil {
@@ -96,15 +110,14 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	event := db.Event{
-		HostUserID:  hostUserID,
-		HostPageID:  hostPageID,
-		Title:       req.Title,
+		HostUserID: &uid,
+		Title:      req.Title,
 		Description: req.Description,
-		Location:    req.Location,
-		EventStart:  start,
-		EventEnd:    end,
-		Price:       price,
-		Capacity:    req.Capacity,
+		Location:   req.Location,
+		EventStart: start,
+		EventEnd:   end,
+		Price:      price,
+		Capacity:   req.Capacity,
 	}
 
 	created, err := db.CreateEvent(ctx, h.DB, event) 
