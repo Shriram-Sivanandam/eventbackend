@@ -21,6 +21,7 @@ type Event struct {
 	Price int `json:"price"`
 	Capacity *int `json:"capacity"`
 	CreatedAt  time.Time  `json:"created_at"`
+	ImageURL *string `json:"image_url"`
 }
 
 type GetEventParams struct {
@@ -39,7 +40,7 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, p GetEventParams) ([]Ev
 		p.Limit = 100
 	}
 
-	query := `SELECT id, host_user_id, host_page_id, title, description, location, event_start, event_end, price, capacity, created_at FROM events WHERE 1=1`
+	query := `SELECT id, host_user_id, host_page_id, title, description, location, event_start, event_end, price, capacity, created_at, image_url FROM events WHERE 1=1`
 
 	args := []any{}
 	argN := 1
@@ -85,7 +86,7 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, p GetEventParams) ([]Ev
 	for rows.Next() {
 		var e Event
 
-		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.ImageURL); err != nil {
 			return nil, err
 		}
 
@@ -111,14 +112,15 @@ func CreateEvent (ctx context.Context, pool *pgxpool.Pool, e Event) (*Event, err
 									event_start,
 									event_end,
 									price,
-									capacity
+									capacity,
+									image_url
 									)
-									VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+									VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 									RETURNING
 									id,
 									created_at
 									`
-	err := pool.QueryRow(ctx, query, e.HostUserID, e.HostPageID, e.Title, e.Description, e.Location, e.EventStart, e.EventEnd, e.Price, e.Capacity).Scan(&e.ID, &e.CreatedAt)
+	err := pool.QueryRow(ctx, query, e.HostUserID, e.HostPageID, e.Title, e.Description, e.Location, e.EventStart, e.EventEnd, e.Price, e.Capacity, e.ImageURL).Scan(&e.ID, &e.CreatedAt)
 
 	if err != nil {
 		return nil, err

@@ -3,7 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -28,12 +31,48 @@ type CreateEventRequest struct {
 	EventEnd   *string `json:"event_end"`
 	Price    *int `json:"price"`
 	Capacity *int `json:"capacity"`
+	ImageURL *string `json:"image_url"`
+}
+
+func stringPtrOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func intPtrOrNil(s string) *int {
+	if s == "" {
+		return nil
+	}
+	v, _ := strconv.Atoi(s)
+	return &v
 }
 
 func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 
 	defer cancel()
+
+	file, header, err := r.FormFile("image")
+	var imageURL *string
+
+	if err == nil {
+		defer file.Close()
+		filename := uuid.New().String() + filepath.Ext(header.Filename)
+		path := "./uploads/" + filename
+
+		out, err := os.Create(path)
+		if err != nil {
+			http.Error(w, "error in image storage", http.StatusBadRequest)
+			return
+		}
+		defer out.Close()
+
+		io.Copy(out, file)
+		url := "/uploads/" + filename
+		imageURL = &url
+	}
 
 	userIDVal := r.Context().Value(middleware.UserIDKey)
 	if userIDVal == nil {
@@ -52,51 +91,45 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req CreateEventRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid json body", http.StatusBadRequest)
+	// var req CreateEventRequest
+	// if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// 	http.Error(w, "invalid json body", http.StatusBadRequest)
+	// 	return
+	// }
+
+	err = r.ParseMultipartForm(10 << 20) // 10MB max
+	if err != nil {
+		http.Error(w, "invalid form data", http.StatusBadRequest)
 		return
 	}
 
-	if req.Title == "" {
+	title := r.FormValue("title")
+	description := r.FormValue("description")
+	location := r.FormValue("location")
+	eventStart := r.FormValue("event_start")
+	eventEnd := r.FormValue("event_end")
+	priceStr := r.FormValue("price")
+
+	price, _ := strconv.Atoi(priceStr)
+
+	if title == "" {
 		http.Error(w, "title is required", http.StatusBadRequest)
 		return
 	}
-	if req.EventStart == "" {
+	if eventStart == "" {
 		http.Error(w, "event_start is required", http.StatusBadRequest)
 		return
 	}
 
-	// var hostUserID *uuid.UUID
-	// if req.HostUserID != nil {
-	// 	id, err := uuid.Parse(*req.HostUserID)
-
-	// 	if err != nil {
-	// 		http.Error(w, "invalid user id", http.StatusBadRequest)
-	// 		return
-	// 	}
-	// 	hostUserID = &id
-	// }
-
-	// var hostPageID *uuid.UUID
-	// if req.HostPageID != nil {
-	// 	id, err := uuid.Parse(*req.HostPageID)
-	// 	if err != nil {
-	// 		http.Error(w, "invalid host_page_id", http.StatusBadRequest)
-	// 		return
-	// 	}
-	// 	hostPageID = &id
-	// }
-
-	start, err := time.Parse(time.RFC3339, req.EventStart)
+	start, err := time.Parse(time.RFC3339, eventStart)
 	if err != nil {
 		http.Error(w, "event_start must be RFC3339", http.StatusBadRequest)
 		return
 	}
 
 	var end *time.Time
-	if req.EventEnd != nil {
-		t, err := time.Parse(time.RFC3339, *req.EventEnd)
+	if eventEnd != "" {
+		t, err := time.Parse(time.RFC3339, eventEnd)
 		if err != nil {
 			http.Error(w, "event_end must be RFC3339", http.StatusBadRequest)
 			return
@@ -104,20 +137,16 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		end = &t
 	}
 
-	price := 0
-	if req.Price != nil {
-		price = *req.Price
-	}
-
 	event := db.Event{
 		HostUserID: &uid,
-		Title:      req.Title,
-		Description: req.Description,
-		Location:   req.Location,
+		Title:      title,
+		Description: stringPtrOrNil(description),
+		Location:   stringPtrOrNil(location),
 		EventStart: start,
 		EventEnd:   end,
 		Price:      price,
-		Capacity:   req.Capacity,
+		Capacity:   intPtrOrNil(r.FormValue("capacity")),
+		ImageURL: imageURL,
 	}
 
 	created, err := db.CreateEvent(ctx, h.DB, event) 

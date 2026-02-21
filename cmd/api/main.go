@@ -35,6 +35,9 @@ func main() {
 	r.Post("/auth/request-otp", authHandler.RequestOTP)
 	r.Post("/auth/verify-otp", authHandler.VerifyOTP)
 
+	fs := http.FileServer(http.Dir("./uploads"))
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", fs))
+
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
