@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/auth"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -84,4 +85,32 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"token": token,
 	})
+}
+
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	userIDVal := r.Context().Value(middleware.UserIDKey);
+	if userIDVal == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	userID := userIDVal.(string)
+
+	var user struct {
+		ID string `json:"id"`
+		Email string `json:"email"`
+		Name string `json:"name"`
+	}
+
+	err := h.DB.QueryRow(r.Context(),
+		`SELECT id,email,name FROM users WHERE id=$1`,
+		userID,
+	).Scan(&user.ID, &user.Email, &user.Name)
+
+	if err != nil {
+		http.Error(w, "Error occured while selecting user details", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(user)
 }

@@ -48,6 +48,8 @@ func main() {
 
 		protected.Post("/events", eventsHandler.CreateEvent)
 		protected.Get("/events", eventsHandler.GetEvents)
+
+		protected.Get("/auth/me", authHandler.Me)
 	})
 
 	r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
