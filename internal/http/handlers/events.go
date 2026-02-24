@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -244,4 +245,28 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		"events": events,
 		"count": len(events),
 	})
+}
+
+func (h *EventsHandler) JoinEvent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	eventIDStr := chi.URLParam(r, "id")
+	eventID, err := uuid.Parse(eventIDStr)
+	if err != nil {
+		http.Error(w, "Invalid Event ID", http.StatusBadRequest)
+	}
+
+	userIDVal := ctx.Value(middleware.UserIDKey)
+	if userIDVal == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	userIDStr := userIDVal.(string)
+	userID, _ := uuid.Parse(userIDStr)
+	err = db.JoinEvent(ctx, h.DB, eventID, userID)
+	if err != nil {
+		http.Error(w, "Could not join event", http.StatusInternalServerError)
+		return
+	}
 }

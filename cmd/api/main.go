@@ -48,6 +48,7 @@ func main() {
 
 		protected.Post("/events", eventsHandler.CreateEvent)
 		protected.Get("/events", eventsHandler.GetEvents)
+		protected.Post("/events/{id}/join", eventsHandler.JoinEvent)
 
 		protected.Get("/auth/me", authHandler.Me)
 	})
