@@ -22,6 +22,7 @@ type Event struct {
 	Capacity *int `json:"capacity"`
 	CreatedAt  time.Time  `json:"created_at"`
 	ImageURL *string `json:"image_url"`
+	Joined bool `json:"joined"`
 }
 
 type GetEventParams struct {
@@ -33,17 +34,24 @@ type GetEventParams struct {
 	Offset int
 }
 
-func GetEvents (ctx context.Context, pool *pgxpool.Pool, p GetEventParams) ([]Event, error) {
+func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p GetEventParams) ([]Event, error) {
 	if p.Limit <= 0 {
 		p.Limit = 20
 	} else if p.Limit > 100 {
 		p.Limit = 100
 	}
 
-	query := `SELECT id, host_user_id, host_page_id, title, description, location, event_start, event_end, price, capacity, created_at, image_url FROM events WHERE 1=1`
+	query := `SELECT e.id, e.host_user_id, e.host_page_id, e.title, e.description, e.location, e.event_start, e.event_end, e.price, e.capacity, e.created_at, e.image_url,
+		EXISTS (
+			SELECT 1 FROM event_registrations er
+			WHERE er.event_id = e.id
+			AND er.user_id = $1
+		) AS JOINED	
+		FROM events e WHERE 1=1`
 
 	args := []any{}
-	argN := 1
+	args = append(args, userID)
+	argN := 2
 
 	if p.HostUserID != nil {
 		query += " AND host_user_id = $" + itoa(argN)
@@ -86,7 +94,7 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, p GetEventParams) ([]Ev
 	for rows.Next() {
 		var e Event
 
-		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.ImageURL); err != nil {
+		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.ImageURL,&e.Joined); err != nil {
 			return nil, err
 		}
 

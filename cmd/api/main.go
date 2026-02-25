@@ -68,8 +68,6 @@ func main() {
 		json.NewEncoder(w).Encode(users)
 	})
 
-	r.Get("/events", eventsHandler.GetEvents)
-
 	server := &http.Server {
 		Addr : ":8080",
 		Handler: r,

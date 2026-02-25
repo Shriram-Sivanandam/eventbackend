@@ -165,6 +165,9 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
+	userIDVal := r.Context().Value(middleware.UserIDKey)
+	userID, _ := uuid.Parse(userIDVal.(string))
+
 	q := r.URL.Query()
 
 	var hostUserID *uuid.UUID
@@ -227,7 +230,7 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		offset = n
 	}
 
-	events, err := db.GetEvents(ctx, h.DB, db.GetEventParams{
+	events, err := db.GetEvents(ctx, h.DB, userID, db.GetEventParams{
 		HostUserID: hostUserID,
 		PageID: pageID,
 		From: from,
