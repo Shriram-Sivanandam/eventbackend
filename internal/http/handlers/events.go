@@ -32,6 +32,13 @@ type CreateEventRequest struct {
 	EventEnd   *string `json:"event_end"`
 	Price    *int `json:"price"`
 	Capacity *int `json:"capacity"`
+	City *string `json:"city"`
+	AddressLineOne *string `json:"address_line_one"`
+	Pincode *string `json:"pincode"`
+	MapsLink *string `json:"maps_link"`
+	DurationMinutes *int `json:"duration_minutes"`
+	ThingsToBring *string `json:"things_to_bring"`
+	ThingsProvided *string `json:"things_provided"`
 	ImageURL *string `json:"image_url"`
 }
 
@@ -110,6 +117,19 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	eventStart := r.FormValue("event_start")
 	eventEnd := r.FormValue("event_end")
 	priceStr := r.FormValue("price")
+	city := r.FormValue("city")
+	addressLineOne := r.FormValue("address_line_one")
+	pincode := r.FormValue("pincode")
+	mapsLink := r.FormValue("maps_link")
+	durationStr := r.FormValue("duration_minutes")
+	thingsToBring := r.FormValue("things_to_bring")
+	thingsProvided := r.FormValue("things_provided")
+
+	var duration *int
+	if durationStr != "" {
+		v, _ := strconv.Atoi(durationStr)
+		duration = &v
+	}
 
 	price, _ := strconv.Atoi(priceStr)
 
@@ -147,12 +167,19 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		EventEnd:   end,
 		Price:      price,
 		Capacity:   intPtrOrNil(r.FormValue("capacity")),
+		City: stringPtrOrNil(city),
+		AddressLineOne: stringPtrOrNil(addressLineOne),
+		Pincode: stringPtrOrNil(pincode),
+		MapsLink: stringPtrOrNil(mapsLink),
+		DurationMinutes: duration,
+		ThingsToBring: stringPtrOrNil(thingsToBring),
+		ThingsProvided: stringPtrOrNil(thingsProvided),
 		ImageURL: imageURL,
 	}
 
 	created, err := db.CreateEvent(ctx, h.DB, event) 
 	if err != nil {
-		http.Error(w, "failed to create event", http. StatusInternalServerError)
+		http.Error(w, "failed to create event", http.StatusInternalServerError)
 		return
 	}
 
@@ -272,4 +299,6 @@ func (h *EventsHandler) JoinEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Could not join event", http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -21,6 +21,13 @@ type Event struct {
 	Price int `json:"price"`
 	Capacity *int `json:"capacity"`
 	CreatedAt  time.Time  `json:"created_at"`
+	City *string `json:"city"`
+	AddressLineOne *string `json:"address_line_one"`
+	Pincode *string `json:"pincode"`
+	MapsLink *string `json:"maps_link"`
+	DurationMinutes *int `json:"duration_minutes"`
+	ThingsToBring *string `json:"things_to_bring"`
+	ThingsProvided *string `json:"things_provided"`
 	ImageURL *string `json:"image_url"`
 	Joined bool `json:"joined"`
 }
@@ -41,7 +48,7 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 		p.Limit = 100
 	}
 
-	query := `SELECT e.id, e.host_user_id, e.host_page_id, e.title, e.description, e.location, e.event_start, e.event_end, e.price, e.capacity, e.created_at, e.image_url,
+	query := `SELECT e.id, e.host_user_id, e.host_page_id, e.title, e.description, e.location, e.event_start, e.event_end, e.price, e.capacity, e.created_at, e.city, e.address_line_one, e.pincode, e.maps_link, e.duration_minutes, e.things_to_bring, e.things_provided, e.image_url,
 		EXISTS (
 			SELECT 1 FROM event_registrations er
 			WHERE er.event_id = e.id
@@ -94,7 +101,7 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 	for rows.Next() {
 		var e Event
 
-		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.ImageURL,&e.Joined); err != nil {
+		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode, &e.MapsLink, &e.DurationMinutes, &e.ThingsToBring, &e.ThingsProvided, &e.ImageURL, &e.Joined); err != nil {
 			return nil, err
 		}
 
@@ -121,14 +128,21 @@ func CreateEvent (ctx context.Context, pool *pgxpool.Pool, e Event) (*Event, err
 									event_end,
 									price,
 									capacity,
+									city,
+									address_line_one,
+									pincode,
+									maps_link,
+									duration_minutes,
+									things_to_bring,
+									things_provided,
 									image_url
 									)
-									VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+									VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 									RETURNING
 									id,
 									created_at
 									`
-	err := pool.QueryRow(ctx, query, e.HostUserID, e.HostPageID, e.Title, e.Description, e.Location, e.EventStart, e.EventEnd, e.Price, e.Capacity, e.ImageURL).Scan(&e.ID, &e.CreatedAt)
+	err := pool.QueryRow(ctx, query, e.HostUserID, e.HostPageID, e.Title, e.Description, e.Location, e.EventStart, e.EventEnd, e.Price, e.Capacity, e.City, e.AddressLineOne, e.Pincode, e.MapsLink, e.DurationMinutes, e.ThingsToBring, e.ThingsProvided, e.ImageURL).Scan(&e.ID, &e.CreatedAt)
 
 	if err != nil {
 		return nil, err
