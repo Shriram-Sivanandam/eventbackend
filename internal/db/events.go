@@ -52,17 +52,20 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 		EXISTS (
 			SELECT 1 FROM event_registrations er
 			WHERE er.event_id = e.id
-			AND er.user_id = $1
 		) AS JOINED	
 		FROM events e WHERE 1=1`
 
 	args := []any{}
-	args = append(args, userID)
-	argN := 2
+	argN := 1
 
 	if p.HostUserID != nil {
 		query += " AND host_user_id = $" + itoa(argN)
 		args = append(args, *p.HostUserID)
+		argN++
+	}
+	if p.HostUserID == nil || (p.HostUserID != nil && *p.HostUserID != userID) {
+		query += " AND host_user_id <> $" + itoa(argN)
+		args = append(args, userID)
 		argN++
 	}
 	if p.PageID != nil {
@@ -97,7 +100,7 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 	defer rows.Close()
 
 	events := make([]Event, 0, p.Limit)
-
+	
 	for rows.Next() {
 		var e Event
 
