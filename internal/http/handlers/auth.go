@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/auth"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/email"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -21,6 +23,7 @@ func (h *AuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
 		http.Error(w, "Invalid json", http.StatusBadRequest)
+		return
 	}
 
 	if body.Email == "" {
@@ -42,6 +45,12 @@ func (h *AuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		http.Error(w, "Inserting OTP failed", http.StatusInternalServerError)
+		return
+	}
+
+	if err := email.SendOTP(body.Email, otp); err != nil {
+		http.Error(w, "Failed to send OTP email", http.StatusInternalServerError)
+		fmt.Println("Failed to send OTP email:", err)
 		return
 	}
 
