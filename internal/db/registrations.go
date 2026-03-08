@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-
 func JoinEvent(ctx context.Context, pool *pgxpool.Pool, eventID, userID uuid.UUID) error {
 	_, err := pool.Exec(ctx, 
 		`INSERT INTO event_registrations (event_id, user_id)

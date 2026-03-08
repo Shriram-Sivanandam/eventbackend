@@ -2,10 +2,12 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,6 +43,10 @@ type GetEventParams struct {
 	Offset int
 }
 
+var ErrNotFound = errors.New("event not found")
+var ErrForbidden = errors.New("you are not the host of this event")
+var ErrAlreadyCancelled = errors.New("event is already cancelled")
+
 func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p GetEventParams) ([]Event, error) {
 	if p.Limit <= 0 {
 		p.Limit = 20
@@ -52,8 +58,9 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 		EXISTS (
 			SELECT 1 FROM event_registrations er
 			WHERE er.event_id = e.id
+			AND er.deleted_at IS NULL
 		) AS JOINED	
-		FROM events e WHERE 1=1`
+		FROM events e WHERE e.deleted_at IS NULL`
 
 	args := []any{}
 	argN := 1
@@ -152,4 +159,53 @@ func CreateEvent (ctx context.Context, pool *pgxpool.Pool, e Event) (*Event, err
 	}
 
 	return &e, nil
+}
+
+func CancelEvent(ctx context.Context, pool *pgxpool.Pool, eventID, callerID uuid.UUID) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var hostUserID uuid.UUID
+	var deletedAt *time.Time
+
+	err = tx.QueryRow(ctx,
+		`SELECT host_user_id, deleted_at FROM events WHERE id = $1`,
+		eventID,
+	).Scan(&hostUserID, &deletedAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if hostUserID != callerID {
+		return ErrForbidden
+	}
+	if deletedAt != nil {
+		return ErrAlreadyCancelled
+	}
+
+	now := time.Now()
+
+	_, err = tx.Exec(ctx,
+		`UPDATE events SET deleted_at = $1 WHERE id = $2`,
+		now, eventID,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx,
+		`UPDATE event_registrations SET deleted_at = $1 WHERE event_id = $2 AND deleted_at IS NULL`,
+		now, eventID,
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }

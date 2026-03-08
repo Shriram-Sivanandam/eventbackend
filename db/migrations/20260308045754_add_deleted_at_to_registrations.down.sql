@@ -1,0 +1,1 @@
+ALTER TABLE event_registrations DROP COLUMN deleted_at;

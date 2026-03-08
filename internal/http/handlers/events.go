@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -297,6 +298,37 @@ func (h *EventsHandler) JoinEvent(w http.ResponseWriter, r *http.Request) {
 	err = db.JoinEvent(ctx, h.DB, eventID, userID)
 	if err != nil {
 		http.Error(w, "Could not join event", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *EventsHandler) CancelEvent(w http.ResponseWriter, r *http.Request) {
+	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	err = db.CancelEvent(r.Context(), h.DB, eventID, callerID)
+	if err != nil {
+		switch {
+		case errors.Is(err, db.ErrNotFound):
+			http.Error(w, "event not found", http.StatusNotFound)
+		case errors.Is(err, db.ErrForbidden):
+			http.Error(w, "only the host can cancel this event", http.StatusForbidden)
+		case errors.Is(err, db.ErrAlreadyCancelled):
+			http.Error(w, "event is already cancelled", http.StatusConflict)
+		default:
+			http.Error(w, "failed to cancel event", http.StatusInternalServerError)
+		}
 		return
 	}
 
