@@ -334,3 +334,39 @@ func (h *EventsHandler) CancelEvent(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *EventsHandler) GetRegisteredEvents(w http.ResponseWriter, r *http.Request) {
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	q := r.URL.Query()
+
+	limit := 20
+	if v := q.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	offset := 0
+	if v := q.Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+
+	events, err := db.GetRegisteredEvents(r.Context(), h.DB, callerID, limit, offset)
+	if err != nil {
+		http.Error(w, "failed to fetch registered events", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"events": events,
+		"count":  len(events),
+	})
+}

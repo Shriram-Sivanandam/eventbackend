@@ -48,6 +48,7 @@ func main() {
 
 		protected.Post("/events", eventsHandler.CreateEvent)
 		protected.Get("/events", eventsHandler.GetEvents)
+		protected.Get("/events/registered", eventsHandler.GetRegisteredEvents)
 		protected.Post("/events/{id}/join", eventsHandler.JoinEvent)
 		protected.Delete("/events/{id}", eventsHandler.CancelEvent)
 

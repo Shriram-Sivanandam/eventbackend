@@ -58,12 +58,14 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 		EXISTS (
 			SELECT 1 FROM event_registrations er
 			WHERE er.event_id = e.id
+			AND er.user_id = $1
 			AND er.deleted_at IS NULL
 		) AS JOINED	
 		FROM events e WHERE e.deleted_at IS NULL`
 
 	args := []any{}
-	argN := 1
+	args = append(args, userID)
+	argN := 2
 
 	if p.HostUserID != nil {
 		query += " AND host_user_id = $" + itoa(argN)
@@ -208,4 +210,55 @@ func CancelEvent(ctx context.Context, pool *pgxpool.Pool, eventID, callerID uuid
 	}
 
 	return tx.Commit(ctx)
+}
+
+func GetRegisteredEvents(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, limit, offset int) ([]Event, error) {
+	if limit <= 0 {
+		limit = 20
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	query := `
+		SELECT
+			e.id, e.host_user_id, e.host_page_id,
+			e.title, e.description, e.location,
+			e.event_start, e.event_end, e.price, e.capacity,
+			e.created_at, e.city, e.address_line_one, e.pincode,
+			e.maps_link, e.duration_minutes, e.things_to_bring,
+			e.things_provided, e.image_url,
+			true AS joined
+		FROM events e
+		INNER JOIN event_registrations er
+			ON er.event_id = e.id
+			AND er.user_id = $1
+			AND er.deleted_at IS NULL
+		WHERE e.deleted_at IS NULL
+		ORDER BY e.event_start ASC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := pool.Query(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]Event, 0, limit)
+	for rows.Next() {
+		var e Event
+		if err := rows.Scan(
+			&e.ID, &e.HostUserID, &e.HostPageID,
+			&e.Title, &e.Description, &e.Location,
+			&e.EventStart, &e.EventEnd, &e.Price, &e.Capacity,
+			&e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode,
+			&e.MapsLink, &e.DurationMinutes, &e.ThingsToBring,
+			&e.ThingsProvided, &e.ImageURL, &e.Joined,
+		); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+
+	return events, rows.Err()
 }
