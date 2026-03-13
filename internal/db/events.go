@@ -32,6 +32,33 @@ type Event struct {
 	ThingsProvided *string `json:"things_provided"`
 	ImageURL *string `json:"image_url"`
 	Joined bool `json:"joined"`
+	RegistrantCount int `json:"registrant_count"`
+}
+
+type EventDashboard struct {
+	Event           Event        `json:"event"`
+	TotalRegistered int          `json:"total_registered"`
+	Accepted        int          `json:"accepted"`
+	Pending         int          `json:"pending"`
+	Rejected        int          `json:"rejected"`
+	Registrants     []Registrant `json:"registrants"`
+}
+
+type Registrant struct {
+	RegistrationID string    `json:"registration_id"`
+	UserID         uuid.UUID `json:"user_id"`
+	Name           *string   `json:"name"`
+	Email          string    `json:"email"`
+	AvatarURL      *string   `json:"avatar_url"`
+	Status         string    `json:"status"`
+	RegisteredAt   string    `json:"registered_at"`
+}
+
+type DashboardStats struct {
+	TotalRegistrants    int `json:"total_registrants"`
+	PendingCount        int `json:"pending_count"`
+	AcceptedCount       int `json:"accepted_count"`
+	RejectedCount       int `json:"rejected_count"`
 }
 
 type GetEventParams struct {
@@ -60,7 +87,12 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 			WHERE er.event_id = e.id
 			AND er.user_id = $1
 			AND er.deleted_at IS NULL
-		) AS JOINED	
+		) AS JOINED,	
+		(
+			SELECT COUNT(*) FROM event_registrations er
+			WHERE er.event_id = e.id
+			AND er.deleted_at IS NULL
+		) AS registrant_count
 		FROM events e WHERE e.deleted_at IS NULL`
 
 	args := []any{}
@@ -113,7 +145,7 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 	for rows.Next() {
 		var e Event
 
-		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode, &e.MapsLink, &e.DurationMinutes, &e.ThingsToBring, &e.ThingsProvided, &e.ImageURL, &e.Joined); err != nil {
+		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode, &e.MapsLink, &e.DurationMinutes, &e.ThingsToBring, &e.ThingsProvided, &e.ImageURL, &e.Joined, &e.RegistrantCount); err != nil {
 			return nil, err
 		}
 
@@ -261,4 +293,110 @@ func GetRegisteredEvents(ctx context.Context, pool *pgxpool.Pool, userID uuid.UU
 	}
 
 	return events, rows.Err()
+}
+
+func GetEventDashboard(ctx context.Context, pool *pgxpool.Pool, eventID, callerID uuid.UUID) (*EventDashboard, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+ 
+	var e Event
+	err = tx.QueryRow(ctx, `
+		SELECT
+			e.id, e.host_user_id, e.host_page_id,
+			e.title, e.description, e.location,
+			e.event_start, e.event_end, e.price, e.capacity,
+			e.created_at, e.city, e.address_line_one, e.pincode,
+			e.maps_link, e.duration_minutes, e.things_to_bring,
+			e.things_provided, e.image_url,
+			true AS joined,
+			(
+				SELECT COUNT(*) FROM event_registrations er
+				WHERE er.event_id = e.id
+				  AND er.deleted_at IS NULL
+				  AND er.status != 'rejected'
+			) AS registrant_count
+		FROM events e
+		WHERE e.id = $1
+		  AND e.deleted_at IS NULL
+	`, eventID).Scan(
+		&e.ID, &e.HostUserID, &e.HostPageID,
+		&e.Title, &e.Description, &e.Location,
+		&e.EventStart, &e.EventEnd, &e.Price, &e.Capacity,
+		&e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode,
+		&e.MapsLink, &e.DurationMinutes, &e.ThingsToBring,
+		&e.ThingsProvided, &e.ImageURL,
+		&e.Joined, &e.RegistrantCount,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if e.HostUserID == nil || *e.HostUserID != callerID {
+		return nil, ErrForbidden
+	}
+ 
+	rows, err := tx.Query(ctx, `
+		SELECT
+			er.id::text,
+			u.id,
+			u.name,
+			u.email,
+			u.avatar_url,
+			er.status,
+			to_char(er.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS registered_at
+		FROM event_registrations er
+		INNER JOIN users u ON u.id = er.user_id
+		WHERE er.event_id = $1
+		  AND er.deleted_at IS NULL
+		ORDER BY er.created_at ASC
+	`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+ 
+	registrants := make([]Registrant, 0)
+	dashboard := &EventDashboard{Event: e}
+ 
+	for rows.Next() {
+		var r Registrant
+		if err := rows.Scan(
+			&r.RegistrationID,
+			&r.UserID,
+			&r.Name,
+			&r.Email,
+			&r.AvatarURL,
+			&r.Status,
+			&r.RegisteredAt,
+		); err != nil {
+			return nil, err
+		}
+		registrants = append(registrants, r)
+ 
+		switch r.Status {
+		case "pending":
+			dashboard.Pending++
+		case "accepted":
+			dashboard.Accepted++
+		case "rejected":
+			dashboard.Rejected++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+ 
+	dashboard.Registrants = registrants
+	dashboard.TotalRegistered = len(registrants)
+ 
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+ 
+	return dashboard, nil
 }

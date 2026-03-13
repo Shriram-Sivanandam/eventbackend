@@ -370,3 +370,35 @@ func (h *EventsHandler) GetRegisteredEvents(w http.ResponseWriter, r *http.Reque
 		"count":  len(events),
 	})
 }
+
+func (h *EventsHandler) GetEventDashboard(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	dashboard, err := db.GetEventDashboard(ctx, h.DB, eventID, callerID)
+	if err != nil {
+		switch {
+		case errors.Is(err, db.ErrNotFound):
+			http.Error(w, "event not found", http.StatusNotFound)
+		case errors.Is(err, db.ErrForbidden):
+			http.Error(w, "only the host can view the dashboard", http.StatusForbidden)
+		default:
+			http.Error(w, "failed to load dashboard", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dashboard)
+}
