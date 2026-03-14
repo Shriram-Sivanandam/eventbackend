@@ -17,3 +17,20 @@ func JoinEvent(ctx context.Context, pool *pgxpool.Pool, eventID, userID uuid.UUI
 
 	return err
 }
+
+func UpdateRegistrationStatus(ctx context.Context, pool *pgxpool.Pool, eventID, userID uuid.UUID, status string) error {
+	tag, err := pool.Exec(ctx, `
+		UPDATE event_registrations
+		SET status = $1
+		WHERE event_id = $2
+		  AND user_id = $3
+		  AND deleted_at IS NULL
+	`, status, eventID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

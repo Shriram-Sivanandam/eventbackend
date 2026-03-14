@@ -402,3 +402,63 @@ func (h *EventsHandler) GetEventDashboard(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(dashboard)
 }
+
+func (h *EventsHandler) UpdateRegistrationStatus(w http.ResponseWriter, r *http.Request) {
+	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+ 
+	targetUserID, err := uuid.Parse(chi.URLParam(r, "userID"))
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+ 
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+ 
+	var body struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json body", http.StatusBadRequest)
+		return
+	}
+ 
+	validStatuses := map[string]bool{"pending": true, "accepted": true, "rejected": true}
+	if !validStatuses[body.Status] {
+		http.Error(w, "status must be one of: pending, accepted, rejected", http.StatusBadRequest)
+		return
+	}
+ 
+	var hostUserID uuid.UUID
+	err = h.DB.QueryRow(r.Context(),
+		`SELECT host_user_id FROM events WHERE id = $1 AND deleted_at IS NULL`,
+		eventID,
+	).Scan(&hostUserID)
+	if err != nil {
+		http.Error(w, "event not found", http.StatusNotFound)
+		return
+	}
+	if hostUserID != callerID {
+		http.Error(w, "only the host can manage registrations", http.StatusForbidden)
+		return
+	}
+ 
+	err = db.UpdateRegistrationStatus(r.Context(), h.DB, eventID, targetUserID, body.Status)
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			http.Error(w, "registration not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to update registration", http.StatusInternalServerError)
+		return
+	}
+ 
+	w.WriteHeader(http.StatusNoContent)
+}

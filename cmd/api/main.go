@@ -48,6 +48,8 @@ func main() {
 
 		protected.Post("/events", eventsHandler.CreateEvent)
 
+		
+		protected.Patch("/events/{id}/registrations/{userID}", eventsHandler.UpdateRegistrationStatus)
 		protected.Get("/events/{id}/dashboard", eventsHandler.GetEventDashboard)
 		protected.Get("/events", eventsHandler.GetEvents)
 		protected.Get("/events/registered", eventsHandler.GetRegisteredEvents)
