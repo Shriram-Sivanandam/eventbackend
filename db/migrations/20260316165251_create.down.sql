@@ -1,0 +1,6 @@
+ALTER TABLE users DROP COLUMN avatar_url;
+ALTER TABLE users DROP COLUMN phone;
+ALTER TABLE users DROP COLUMN bio;
+ALTER TABLE users DROP COLUMN gender;
+ALTER TABLE users DROP COLUMN age;
+ALTER TABLE users DROP COLUMN updated_at;

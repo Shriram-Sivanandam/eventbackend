@@ -3,11 +3,17 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/auth"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/email"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -122,4 +128,72 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(user)
+}
+
+// PATCH /auth/me
+var validGenders = map[string]bool{
+	"male":              true,
+	"female":            true,
+	"non_binary":        true,
+	"prefer_not_to_say": true,
+}
+
+func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+ 
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "invalid form data", http.StatusBadRequest)
+		return
+	}
+ 
+	params := db.UpdateProfileParams{
+		Name:      stringPtrOrNil(r.FormValue("name")),
+		Phone:     stringPtrOrNil(r.FormValue("phone")),
+		Bio:       stringPtrOrNil(r.FormValue("bio")),
+		City:      stringPtrOrNil(r.FormValue("city")),
+	}
+ 
+	if g := r.FormValue("gender"); g != "" {
+		if !validGenders[g] {
+			http.Error(w, "invalid gender value", http.StatusBadRequest)
+			return
+		}
+		params.Gender = &g
+	}
+ 
+	if a := r.FormValue("age"); a != "" {
+		age, err := strconv.Atoi(a)
+		if err != nil || age < 13 || age > 120 {
+			http.Error(w, "age must be a number between 13 and 120", http.StatusBadRequest)
+			return
+		}
+		params.Age = &age
+	}
+ 
+	file, header, err := r.FormFile("avatar")
+	if err == nil {
+		defer file.Close()
+		filename := uuid.New().String() + filepath.Ext(header.Filename)
+		path := "./uploads/" + filename
+		out, err := os.Create(path)
+		if err != nil {
+			http.Error(w, "error saving avatar", http.StatusInternalServerError)
+			return
+		}
+		defer out.Close()
+		io.Copy(out, file)
+		url := "/uploads/" + filename
+		params.AvatarURL = &url
+	}
+ 
+	if err := db.UpdateProfile(r.Context(), h.DB, callerID, params); err != nil {
+		http.Error(w, "failed to update profile", http.StatusInternalServerError)
+		return
+	}
+ 
+	w.WriteHeader(http.StatusNoContent)
 }

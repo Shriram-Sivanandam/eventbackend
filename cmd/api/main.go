@@ -45,6 +45,7 @@ func main() {
 
 	r.Group(func(protected chi.Router) {
 		protected.Use(middleware.AuthMiddleware)
+		protected.Patch("/auth/me", authHandler.UpdateProfile)
 
 		protected.Post("/events", eventsHandler.CreateEvent)
 
