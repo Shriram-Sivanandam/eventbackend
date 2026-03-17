@@ -278,6 +278,37 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /events/{id}
+func (h *EventsHandler) GetEventByID(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+ 
+	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+ 
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+ 
+	event, err := db.GetEventByID(ctx, h.DB, eventID, callerID)
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			http.Error(w, "event not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to fetch event", http.StatusInternalServerError)
+		return
+	}
+ 
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(event)
+}
+
 func (h *EventsHandler) JoinEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

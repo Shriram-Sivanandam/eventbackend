@@ -157,6 +157,114 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 
 }
 
+type EventDetail struct {
+	Event
+ 
+	HostName         *string  `json:"host_name"`
+	HostAvatarURL    *string  `json:"host_avatar_url"`
+	HostingRating    *float64 `json:"hosting_rating"`
+	HostTotalHosted  int      `json:"host_total_hosted"`
+}
+
+func GetEventByID(ctx context.Context, pool *pgxpool.Pool, eventID, callerID uuid.UUID) (*EventDetail, error) {
+	var d EventDetail
+ 
+	err := pool.QueryRow(ctx, `
+		SELECT
+			-- core event fields
+			e.id,
+			e.host_user_id,
+			e.host_page_id,
+			e.title,
+			e.description,
+			e.location,
+			e.event_start,
+			e.event_end,
+			e.price,
+			e.capacity,
+			e.created_at,
+			e.city,
+			e.address_line_one,
+			e.pincode,
+			e.maps_link,
+			e.duration_minutes,
+			e.things_to_bring,
+			e.things_provided,
+			e.image_url,
+ 
+			EXISTS (
+				SELECT 1 FROM event_registrations er
+				WHERE er.event_id = e.id
+				  AND er.user_id  = $2
+				  AND er.deleted_at IS NULL
+			) AS joined,
+ 
+			(
+				SELECT COUNT(*) FROM event_registrations er
+				WHERE er.event_id = e.id
+				  AND er.deleted_at IS NULL
+				  AND er.status != 'rejected'
+			) AS registrant_count,
+ 
+			u.name        AS host_name,
+			u.avatar_url  AS host_avatar_url,
+ 
+			(
+				SELECT ROUND(AVG(score)::numeric, 1)
+				FROM event_ratings
+				WHERE ratee_id   = u.id
+				  AND rating_type = 'host'
+			) AS hosting_rating,
+ 
+			(
+				SELECT COUNT(*)
+				FROM events
+				WHERE host_user_id = u.id
+				  AND deleted_at IS NULL
+			) AS host_total_hosted
+ 
+		FROM events e
+		LEFT JOIN users u ON u.id = e.host_user_id
+		WHERE e.id = $1
+		  AND e.deleted_at IS NULL
+	`, eventID, callerID).Scan(
+		&d.ID,
+		&d.HostUserID,
+		&d.HostPageID,
+		&d.Title,
+		&d.Description,
+		&d.Location,
+		&d.EventStart,
+		&d.EventEnd,
+		&d.Price,
+		&d.Capacity,
+		&d.CreatedAt,
+		&d.City,
+		&d.AddressLineOne,
+		&d.Pincode,
+		&d.MapsLink,
+		&d.DurationMinutes,
+		&d.ThingsToBring,
+		&d.ThingsProvided,
+		&d.ImageURL,
+		&d.Joined,
+		&d.RegistrantCount,
+		&d.HostName,
+		&d.HostAvatarURL,
+		&d.HostingRating,
+		&d.HostTotalHosted,
+	)
+ 
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+ 
+	return &d, nil
+}
+
 func itoa(i int) string {
 	return fmt.Sprintf("%d", i)
 }
