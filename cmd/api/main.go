@@ -29,6 +29,7 @@ func main() {
 
 	authHandler := &handlers.AuthHandler{DB: dbPool}
 	eventsHandler := &handlers.EventsHandler{DB: dbPool}
+	usersHandler := &handlers.UsersHandler{DB: dbPool}
 
 	r := chi.NewRouter()
 
@@ -58,6 +59,8 @@ func main() {
 		
 		protected.Post("/events/{id}/join", eventsHandler.JoinEvent)
 		protected.Delete("/events/{id}", eventsHandler.CancelEvent)
+
+		protected.Get("/users/{id}/profile", usersHandler.GetHostProfile)
 
 		protected.Get("/auth/me", authHandler.Me)
 	})

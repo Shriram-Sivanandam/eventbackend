@@ -171,7 +171,6 @@ func GetEventByID(ctx context.Context, pool *pgxpool.Pool, eventID, callerID uui
  
 	err := pool.QueryRow(ctx, `
 		SELECT
-			-- core event fields
 			e.id,
 			e.host_user_id,
 			e.host_page_id,
