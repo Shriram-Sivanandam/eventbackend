@@ -30,6 +30,7 @@ func main() {
 	authHandler := &handlers.AuthHandler{DB: dbPool}
 	eventsHandler := &handlers.EventsHandler{DB: dbPool}
 	usersHandler := &handlers.UsersHandler{DB: dbPool}
+	tagsHandler := &handlers.TagsHandler{DB: dbPool}
 
 	r := chi.NewRouter()
 
@@ -61,6 +62,8 @@ func main() {
 		protected.Delete("/events/{id}", eventsHandler.CancelEvent)
 
 		protected.Get("/users/{id}/profile", usersHandler.GetHostProfile)
+
+		protected.Get("/tags", tagsHandler.GetTags)
 
 		protected.Get("/auth/me", authHandler.Me)
 	})
