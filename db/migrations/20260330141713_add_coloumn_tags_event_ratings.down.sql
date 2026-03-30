@@ -1,0 +1,1 @@
+ALTER TABLE event_ratings DROP COLUMN tags;
