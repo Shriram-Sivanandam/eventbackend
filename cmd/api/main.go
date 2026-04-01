@@ -51,7 +51,8 @@ func main() {
 
 		protected.Post("/events", eventsHandler.CreateEvent)
 
-		
+		protected.Get("/events/unrated", eventsHandler.GetUnratedEvents) 
+		protected.Post("/events/{id}/rate", eventsHandler.SubmitRating)
 		protected.Patch("/events/{id}/registrations/{userID}", eventsHandler.UpdateRegistrationStatus)
 		protected.Get("/events/{id}/dashboard", eventsHandler.GetEventDashboard)
 		protected.Get("/events/{id}", eventsHandler.GetEventByID)
