@@ -118,3 +118,28 @@ func (h *EventsHandler) SubmitRating(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// POST /events/{id}/dismiss-rating-prompt
+func (h *EventsHandler) DismissRatingPrompt(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+ 
+	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+ 
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+ 
+	if err := db.DismissRatingPrompt(ctx, h.DB, eventID, callerID); err != nil {
+		http.Error(w, "failed to dismiss prompt", http.StatusInternalServerError)
+		return
+	}
+ 
+	w.WriteHeader(http.StatusNoContent)
+}

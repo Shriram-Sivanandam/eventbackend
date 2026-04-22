@@ -1,0 +1,1 @@
+ALTER TABLE event_registrations ADD COLUMN IF NOT EXISTS rating_prompt_seen_at TIMESTAMPTZ;

@@ -1,0 +1,1 @@
+ALTER TABLE event_registrations DROP COLUMN rating_prompt_seen_at;

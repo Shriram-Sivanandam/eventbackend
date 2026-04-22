@@ -53,6 +53,7 @@ func main() {
 
 		protected.Get("/events/unrated", eventsHandler.GetUnratedEvents) 
 		protected.Post("/events/{id}/rate", eventsHandler.SubmitRating)
+		protected.Post("/events/{id}/dismiss-rating-prompt", eventsHandler.DismissRatingPrompt)
 		protected.Patch("/events/{id}/registrations/{userID}", eventsHandler.UpdateRegistrationStatus)
 		protected.Get("/events/{id}/dashboard", eventsHandler.GetEventDashboard)
 		protected.Get("/events/{id}", eventsHandler.GetEventByID)

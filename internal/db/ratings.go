@@ -27,23 +27,24 @@ func GetUnratedEvents(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID)
 			e.event_start,
 			e.image_url,
 			e.host_user_id,
-			u.name  AS host_name,
+			u.name       AS host_name,
 			u.avatar_url AS host_avatar
 		FROM events e
 		INNER JOIN event_registrations er
-			ON er.event_id   = e.id
+			ON  er.event_id  = e.id
 			AND er.user_id   = $1
 			AND er.deleted_at IS NULL
 			AND er.status    = 'accepted'
+			AND er.rating_prompt_seen_at IS NULL
 		LEFT JOIN users u ON u.id = e.host_user_id
 		WHERE e.event_start < NOW()
 		  AND e.deleted_at  IS NULL
 		  AND e.host_user_id <> $1
 		  AND NOT EXISTS (
-			SELECT 1 FROM event_ratings er2
-			WHERE er2.event_id    = e.id
-			  AND er2.rater_id    = $1
-			  AND er2.rating_type = 'host'
+				SELECT 1 FROM event_ratings r
+				WHERE r.event_id    = e.id
+				  AND r.rater_id    = $1
+				  AND r.rating_type = 'host'
 		  )
 		ORDER BY e.event_start DESC
 		LIMIT 10
@@ -57,13 +58,8 @@ func GetUnratedEvents(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID)
 	for rows.Next() {
 		var ev UnratedEvent
 		if err := rows.Scan(
-			&ev.ID,
-			&ev.Title,
-			&ev.EventStart,
-			&ev.ImageURL,
-			&ev.HostUserID,
-			&ev.HostName,
-			&ev.HostAvatar,
+			&ev.ID, &ev.Title, &ev.EventStart, &ev.ImageURL,
+			&ev.HostUserID, &ev.HostName, &ev.HostAvatar,
 		); err != nil {
 			return nil, err
 		}
@@ -96,5 +92,16 @@ func SubmitRating(
 			comment = EXCLUDED.comment,
 			tags    = EXCLUDED.tags
 	`, eventID, raterID, rateeID, ratingType, score, comment, tagsStr)
+	return err
+}
+
+func DismissRatingPrompt(ctx context.Context, pool *pgxpool.Pool, eventID, userID uuid.UUID) error {
+	_, err := pool.Exec(ctx, `
+		UPDATE event_registrations
+		SET rating_prompt_seen_at = NOW()
+		WHERE event_id   = $1
+		  AND user_id    = $2
+		  AND deleted_at IS NULL
+	`, eventID, userID)
 	return err
 }
