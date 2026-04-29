@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -125,6 +126,7 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	durationStr := r.FormValue("duration_minutes")
 	thingsToBring := r.FormValue("things_to_bring")
 	thingsProvided := r.FormValue("things_provided")
+	tagIDs := r.Form["tag_ids"]
 
 	var duration *int
 	if durationStr != "" {
@@ -183,6 +185,20 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to create event", http.StatusInternalServerError)
 		return
 	}
+
+	for _, tagIDStr := range tagIDs {
+    tagID, err := uuid.Parse(tagIDStr)
+    if err != nil {
+        continue
+    }
+    _, err = h.DB.Exec(ctx,
+        `INSERT INTO event_tags (event_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        created.ID, tagID,
+    )
+    if err != nil {
+        log.Printf("failed to insert tag %s for event %s: %v", tagIDStr, created.ID, err)
+    }
+}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
