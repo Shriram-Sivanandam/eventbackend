@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -33,6 +34,7 @@ type Event struct {
 	ImageURL *string `json:"image_url"`
 	Joined bool `json:"joined"`
 	RegistrantCount int `json:"registrant_count"`
+	Tags []EventTag `json:"tags"`
 }
 
 type EventDashboard struct {
@@ -74,6 +76,19 @@ var ErrNotFound = errors.New("event not found")
 var ErrForbidden = errors.New("you are not the host of this event")
 var ErrAlreadyCancelled = errors.New("event is already cancelled")
 
+type EventTag struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func unmarshalTags(data []byte, dest *[]EventTag) error {
+	if len(data) == 0 || string(data) == "null" {
+		*dest = []EventTag{}
+		return nil
+	}
+	return json.Unmarshal(data, dest)
+}
+
 func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p GetEventParams) ([]Event, error) {
 	if p.Limit <= 0 {
 		p.Limit = 20
@@ -92,7 +107,16 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 			SELECT COUNT(*) FROM event_registrations er
 			WHERE er.event_id = e.id
 			AND er.deleted_at IS NULL
-		) AS registrant_count
+		) AS registrant_count,
+		 COALESCE(
+				(
+					SELECT json_agg(json_build_object('id', t.id::text, 'name', t.name))
+					FROM event_tags et
+					JOIN tags t ON t.id = et.tag_id
+					WHERE et.event_id = e.id
+				),
+				'[]'::json
+			) AS tags
 		FROM events e WHERE e.deleted_at IS NULL`
 
 	args := []any{}
@@ -144,9 +168,14 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 	
 	for rows.Next() {
 		var e Event
+		var tagsJSON []byte
 
-		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode, &e.MapsLink, &e.DurationMinutes, &e.ThingsToBring, &e.ThingsProvided, &e.ImageURL, &e.Joined, &e.RegistrantCount); err != nil {
+		if err := rows.Scan(&e.ID, &e.HostUserID, &e.HostPageID, &e.Title, &e.Description, &e.Location, &e.EventStart, &e.EventEnd, &e.Price, &e.Capacity, &e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode, &e.MapsLink, &e.DurationMinutes, &e.ThingsToBring, &e.ThingsProvided, &e.ImageURL, &e.Joined, &e.RegistrantCount, &tagsJSON); err != nil {
 			return nil, err
+		}
+
+		if err := unmarshalTags(tagsJSON, &e.Tags); err != nil {
+			return nil, fmt.Errorf("unmarshal tags for event %s: %w", e.ID, err)
 		}
 
 		events = append(events, e)
