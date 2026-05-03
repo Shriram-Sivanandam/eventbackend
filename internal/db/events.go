@@ -35,6 +35,7 @@ type Event struct {
 	Joined bool `json:"joined"`
 	RegistrantCount int `json:"registrant_count"`
 	Tags []EventTag `json:"tags"`
+	HasRated bool `json:"has_rated"`
 }
 
 type EventDashboard struct {
@@ -395,7 +396,13 @@ func GetRegisteredEvents(ctx context.Context, pool *pgxpool.Pool, userID uuid.UU
 			e.created_at, e.city, e.address_line_one, e.pincode,
 			e.maps_link, e.duration_minutes, e.things_to_bring,
 			e.things_provided, e.image_url,
-			true AS joined
+			true AS joined,
+			EXISTS (
+				SELECT 1 FROM event_ratings r
+				WHERE r.event_id = e.id
+				AND r.rater_id = $1
+				AND r.rating_type = 'host'
+			) AS has_rated
 		FROM events e
 		INNER JOIN event_registrations er
 			ON er.event_id = e.id
@@ -421,7 +428,7 @@ func GetRegisteredEvents(ctx context.Context, pool *pgxpool.Pool, userID uuid.UU
 			&e.EventStart, &e.EventEnd, &e.Price, &e.Capacity,
 			&e.CreatedAt, &e.City, &e.AddressLineOne, &e.Pincode,
 			&e.MapsLink, &e.DurationMinutes, &e.ThingsToBring,
-			&e.ThingsProvided, &e.ImageURL, &e.Joined,
+			&e.ThingsProvided, &e.ImageURL, &e.Joined, &e.HasRated,
 		); err != nil {
 			return nil, err
 		}
