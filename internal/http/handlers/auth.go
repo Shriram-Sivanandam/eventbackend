@@ -13,12 +13,14 @@ import (
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/email"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/storage"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type AuthHandler struct {
 	DB *pgxpool.Pool
+	R2 *storage.R2Client
 }
 
 func (h *AuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {

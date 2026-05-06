@@ -10,6 +10,7 @@ import (
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/handlers"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
 )
@@ -25,10 +26,15 @@ func main() {
 	}
 	defer dbPool.Close()
 
+	r2, err := storage.NewR2Client()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log.Println("connected")
 
-	authHandler := &handlers.AuthHandler{DB: dbPool}
-	eventsHandler := &handlers.EventsHandler{DB: dbPool}
+	authHandler := &handlers.AuthHandler{DB: dbPool, R2: r2}
+	eventsHandler := &handlers.EventsHandler{DB: dbPool, R2: r2}
 	usersHandler := &handlers.UsersHandler{DB: dbPool}
 	tagsHandler := &handlers.TagsHandler{DB: dbPool}
 
@@ -36,9 +42,6 @@ func main() {
 
 	r.Post("/auth/request-otp", authHandler.RequestOTP)
 	r.Post("/auth/verify-otp", authHandler.VerifyOTP)
-
-	fs := http.FileServer(http.Dir("./uploads"))
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/", fs))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

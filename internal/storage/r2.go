@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"mime"
@@ -62,7 +63,7 @@ func (r *R2Client) Upload(ctx context.Context, key string, body []byte, ext stri
 	_, err := r.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(r.bucket),
 		Key:         aws.String(key),
-		Body:        bytesReader(body),
+		Body:        bytes.NewReader(body),
 		ContentType: aws.String(contentType),
 	})
 	if err != nil {
@@ -86,22 +87,4 @@ func (r *R2Client) KeyFromURL(url string) string {
 		return url[len(prefix):]
 	}
 	return ""
-}
-
-type bytesReaderImpl struct {
-	data []byte
-	pos  int
-}
-
-func bytesReader(data []byte) *bytesReaderImpl {
-	return &bytesReaderImpl{data: data}
-}
-
-func (b *bytesReaderImpl) Read(p []byte) (n int, err error) {
-	if b.pos >= len(b.data) {
-		return 0, fmt.Errorf("EOF")
-	}
-	n = copy(p, b.data[b.pos:])
-	b.pos += n
-	return n, nil
 }

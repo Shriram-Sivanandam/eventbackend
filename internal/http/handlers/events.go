@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -18,10 +17,12 @@ import (
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/storage"
 )
 
 type EventsHandler struct {
 	DB *pgxpool.Pool
+	R2 *storage.R2Client
 }
 
 type CreateEventRequest struct {
@@ -69,20 +70,41 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		defer file.Close()
-		filename := uuid.New().String() + filepath.Ext(header.Filename)
-		path := "./uploads/" + filename
-
-		out, err := os.Create(path)
+	
+		data, err := io.ReadAll(file)
 		if err != nil {
-			http.Error(w, "error in image storage", http.StatusBadRequest)
+			http.Error(w, "failed to read image", http.StatusInternalServerError)
 			return
 		}
-		defer out.Close()
-
-		io.Copy(out, file)
-		url := "/uploads/" + filename
+	
+		ext := filepath.Ext(header.Filename)
+		key := "events/" + uuid.New().String() + ext
+	
+		url, err := h.R2.Upload(r.Context(), key, data, ext)
+		if err != nil {
+			http.Error(w, "failed to upload image", http.StatusInternalServerError)
+			return
+		}
+	
 		imageURL = &url
 	}
+
+	// if err == nil {
+	// 	defer file.Close()
+	// 	filename := uuid.New().String() + filepath.Ext(header.Filename)
+	// 	path := "./uploads/" + filename
+
+	// 	out, err := os.Create(path)
+	// 	if err != nil {
+	// 		http.Error(w, "error in image storage", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// 	defer out.Close()
+
+	// 	io.Copy(out, file)
+	// 	url := "/uploads/" + filename
+	// 	imageURL = &url
+	// }
 
 	userIDVal := r.Context().Value(middleware.UserIDKey)
 	if userIDVal == nil {
