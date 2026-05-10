@@ -86,12 +86,13 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID string
+	var onboardingComplete bool
 	err = h.DB.QueryRow(r.Context(),
 	`INSERT INTO users(email,name)
 	VALUES($1,$1)
 	ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email
-	RETURNING id`,
-	body.Email).Scan(&userID)
+	RETURNING id, onboarding_complete`,
+	body.Email).Scan(&userID, &onboardingComplete)
 
 	token, err := auth.CreateJWT(userID)
 	if err != nil {
@@ -99,8 +100,9 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]any{
 		"token": token,
+		"onboarding_complete": onboardingComplete,
 	})
 }
 

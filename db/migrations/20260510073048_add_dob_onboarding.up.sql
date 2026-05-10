@@ -1,0 +1,3 @@
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS onboarding_complete BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS date_of_birth DATE;
