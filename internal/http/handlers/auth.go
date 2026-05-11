@@ -86,13 +86,12 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID string
-	var onboardingComplete bool
 	err = h.DB.QueryRow(r.Context(),
 	`INSERT INTO users(email,name)
 	VALUES($1,$1)
 	ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email
-	RETURNING id, onboarding_complete`,
-	body.Email).Scan(&userID, &onboardingComplete)
+	RETURNING id`,
+	body.Email).Scan(&userID)
 
 	token, err := auth.CreateJWT(userID)
 	if err != nil {
@@ -100,9 +99,8 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]any{
+	json.NewEncoder(w).Encode(map[string]string{
 		"token": token,
-		"onboarding_complete": onboardingComplete,
 	})
 }
 
@@ -119,12 +117,13 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 		Email string `json:"email"`
 		Name string `json:"name"`
+		OnboardingCompleted bool `json:"onboarding_completed"`
 	}
 
 	err := h.DB.QueryRow(r.Context(),
-		`SELECT id,email,name FROM users WHERE id=$1`,
+		`SELECT id,email,name,onboarding_completed FROM users WHERE id=$1`,
 		userID,
-	).Scan(&user.ID, &user.Email, &user.Name)
+	).Scan(&user.ID, &user.Email, &user.Name, &user.OnboardingCompleted)
 
 	if err != nil {
 		http.Error(w, "Error occured while selecting user details", http.StatusInternalServerError)
