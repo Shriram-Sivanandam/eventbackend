@@ -117,13 +117,13 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 		Email string `json:"email"`
 		Name string `json:"name"`
-		OnboardingCompleted bool `json:"onboarding_completed"`
+		OnboardingComplete bool `json:"onboarding_complete"`
 	}
 
 	err := h.DB.QueryRow(r.Context(),
-		`SELECT id,email,name,onboarding_completed FROM users WHERE id=$1`,
+		`SELECT id,email,name,onboarding_complete FROM users WHERE id=$1`,
 		userID,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.OnboardingCompleted)
+	).Scan(&user.ID, &user.Email, &user.Name, &user.OnboardingComplete)
 
 	if err != nil {
 		http.Error(w, "Error occured while selecting user details", http.StatusInternalServerError)
