@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 
@@ -154,12 +153,18 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
  
 	params := db.UpdateProfileParams{
-		Name:      stringPtrOrNil(r.FormValue("name")),
-		Phone:     stringPtrOrNil(r.FormValue("phone")),
-		Bio:       stringPtrOrNil(r.FormValue("bio")),
-		City:      stringPtrOrNil(r.FormValue("city")),
+		Name:  stringPtrOrNil(r.FormValue("name")),
+		Phone: stringPtrOrNil(r.FormValue("phone")),
+		Bio:   stringPtrOrNil(r.FormValue("bio")),
+		City:  stringPtrOrNil(r.FormValue("city")),
 	}
  
+	if r.FormValue("onboarding") == "true" {
+		t := true
+		params.OnboardingComplete = &t
+	}
+ 
+	// Gender
 	if g := r.FormValue("gender"); g != "" {
 		if !validGenders[g] {
 			http.Error(w, "invalid gender value", http.StatusBadRequest)
@@ -171,25 +176,35 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if a := r.FormValue("age"); a != "" {
 		age, err := strconv.Atoi(a)
 		if err != nil || age < 13 || age > 120 {
-			http.Error(w, "age must be a number between 13 and 120", http.StatusBadRequest)
+			http.Error(w, "age must be between 13 and 120", http.StatusBadRequest)
 			return
 		}
 		params.Age = &age
 	}
  
+	if dob := r.FormValue("date_of_birth"); dob != "" {
+		params.DateOfBirth = &dob
+	}
+ 
 	file, header, err := r.FormFile("avatar")
 	if err == nil {
 		defer file.Close()
-		filename := uuid.New().String() + filepath.Ext(header.Filename)
-		path := "./uploads/" + filename
-		out, err := os.Create(path)
+ 
+		data, err := io.ReadAll(file)
 		if err != nil {
-			http.Error(w, "error saving avatar", http.StatusInternalServerError)
+			http.Error(w, "failed to read avatar", http.StatusInternalServerError)
 			return
 		}
-		defer out.Close()
-		io.Copy(out, file)
-		url := "/uploads/" + filename
+ 
+		ext := filepath.Ext(header.Filename)
+		key := "avatars/" + callerID.String() + ext
+ 
+		url, err := h.R2.Upload(r.Context(), key, data, ext)
+		if err != nil {
+			http.Error(w, "failed to upload avatar", http.StatusInternalServerError)
+			return
+		}
+ 
 		params.AvatarURL = &url
 	}
  

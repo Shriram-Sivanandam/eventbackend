@@ -40,30 +40,42 @@ func GetUsers (ctx context.Context, pool *pgxpool.Pool) ([]User, error) {
 }
 
 type UpdateProfileParams struct {
-	Name      *string
-	Phone     *string
-	Bio       *string
-	City      *string
-	AvatarURL *string
-	Gender    *string 
-	Age       *int
+	Name               *string
+	Phone              *string
+	Bio                *string
+	City               *string
+	Gender             *string
+	Age                *int
+	DateOfBirth        *string
+	AvatarURL          *string
+	OnboardingComplete *bool
 }
- 
+
 func UpdateProfile(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p UpdateProfileParams) error {
 	_, err := pool.Exec(ctx, `
 		UPDATE users SET
-			name       = COALESCE($1,  name),
-			phone      = COALESCE($2,  phone),
-			bio        = COALESCE($3,  bio),
-			city       = COALESCE($4,  city),
-			avatar_url = COALESCE($5,  avatar_url),
-			gender     = COALESCE($6,  gender),
-			age        = COALESCE($7,  age),
-			updated_at = NOW()
-		WHERE id = $8
+			name                = COALESCE($1,  name),
+			phone               = COALESCE($2,  phone),
+			bio                 = COALESCE($3,  bio),
+			city                = COALESCE($4,  city),
+			gender              = COALESCE($5,  gender),
+			age                 = COALESCE($6,  age),
+			date_of_birth       = COALESCE($7::date, date_of_birth),
+			avatar_url          = COALESCE($8,  avatar_url),
+			onboarding_complete = COALESCE($9,  onboarding_complete),
+			updated_at          = NOW()
+		WHERE id = $10
 	`,
-		p.Name, p.Phone, p.Bio, p.City,
-		p.AvatarURL, p.Gender, p.Age, userID,
+		p.Name,
+		p.Phone,
+		p.Bio,
+		p.City,
+		p.Gender,
+		p.Age,
+		p.DateOfBirth,
+		p.AvatarURL,
+		p.OnboardingComplete,
+		userID,
 	)
 	return err
 }
