@@ -89,23 +89,6 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		imageURL = &url
 	}
 
-	// if err == nil {
-	// 	defer file.Close()
-	// 	filename := uuid.New().String() + filepath.Ext(header.Filename)
-	// 	path := "./uploads/" + filename
-
-	// 	out, err := os.Create(path)
-	// 	if err != nil {
-	// 		http.Error(w, "error in image storage", http.StatusBadRequest)
-	// 		return
-	// 	}
-	// 	defer out.Close()
-
-	// 	io.Copy(out, file)
-	// 	url := "/uploads/" + filename
-	// 	imageURL = &url
-	// }
-
 	userIDVal := r.Context().Value(middleware.UserIDKey)
 	if userIDVal == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -123,13 +106,7 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// var req CreateEventRequest
-	// if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-	// 	http.Error(w, "invalid json body", http.StatusBadRequest)
-	// 	return
-	// }
-
-	err = r.ParseMultipartForm(10 << 20) // 10MB max
+	err = r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		http.Error(w, "invalid form data", http.StatusBadRequest)
 		return
@@ -276,7 +253,27 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		to = &t
 	}
 
-	limit := 20
+	var city *string
+	if v := q.Get("city"); v != "" {
+		city = &v
+	}
+
+	var tagID *uuid.UUID
+	if v := q.Get("tag_id"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(w, "invalid tag_id", http.StatusBadRequest)
+			return
+		}
+		tagID = &id
+	}
+
+	var search *string
+	if v := q.Get("search"); v != "" {
+		search = &v
+	}
+
+	limit := 10
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 1 {
@@ -301,6 +298,9 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		PageID: pageID,
 		From: from,
 		To: to,
+		City: city,
+		TagID: tagID,
+		Search: search,
 		Limit: limit,
 		Offset: offset,
 	})

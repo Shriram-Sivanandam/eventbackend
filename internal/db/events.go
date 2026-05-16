@@ -69,6 +69,9 @@ type GetEventParams struct {
 	PageID *uuid.UUID
 	From *time.Time
 	To *time.Time
+	City *string
+	TagID *uuid.UUID
+	Search *string
 	Limit int
 	Offset int
 }
@@ -149,6 +152,23 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 		args = append(args, *p.To)
 		argN++
 	}
+	if p.City != nil {
+		query += " AND city ILIKE $" + itoa(argN)
+		args = append(args, "%"+*p.City+"%")
+		argN++
+	}
+	if p.TagID != nil {
+		query += " AND EXISTS (SELECT 1 FROM event_tags et WHERE et.event_id = e.id AND et.tag_id = $" + itoa(argN) + ")"
+		args = append(args, *p.TagID)
+		argN++
+	}
+	if p.Search != nil {
+    query += " AND (e.title ILIKE $" + itoa(argN) +
+             " OR e.location ILIKE $" + itoa(argN) +
+             " OR e.city ILIKE $" + itoa(argN) + ")"
+    args = append(args, "%"+*p.Search+"%")
+    argN++
+}
 
 	query += " ORDER BY event_start ASC"
 	query += " LIMIT $" + itoa(argN)
