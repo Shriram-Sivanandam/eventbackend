@@ -258,14 +258,15 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		city = &v
 	}
 
-	var tagID *uuid.UUID
-	if v := q.Get("tag_id"); v != "" {
-		id, err := uuid.Parse(v)
+	tagIDStrs := q["tag_id"]
+	var tagIDs []uuid.UUID
+	for _, s := range tagIDStrs {
+		id, err := uuid.Parse(s)
 		if err != nil {
-			http.Error(w, "invalid tag_id", http.StatusBadRequest)
+			http.Error(w, "invalid tag_id: "+s, http.StatusBadRequest)
 			return
 		}
-		tagID = &id
+		tagIDs = append(tagIDs, id)
 	}
 
 	var search *string
@@ -299,7 +300,7 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		From: from,
 		To: to,
 		City: city,
-		TagID: tagID,
+		TagIDs: tagIDs,
 		Search: search,
 		Limit: limit,
 		Offset: offset,

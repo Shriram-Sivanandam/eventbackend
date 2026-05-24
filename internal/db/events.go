@@ -70,7 +70,7 @@ type GetEventParams struct {
 	From *time.Time
 	To *time.Time
 	City *string
-	TagID *uuid.UUID
+	TagIDs []uuid.UUID
 	Search *string
 	Limit int
 	Offset int
@@ -157,9 +157,13 @@ func GetEvents (ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, p Get
 		args = append(args, "%"+*p.City+"%")
 		argN++
 	}
-	if p.TagID != nil {
-		query += " AND EXISTS (SELECT 1 FROM event_tags et WHERE et.event_id = e.id AND et.tag_id = $" + itoa(argN) + ")"
-		args = append(args, *p.TagID)
+	if len(p.TagIDs) > 0 {
+		query += ` AND EXISTS (
+			SELECT 1 FROM event_tags et
+			WHERE et.event_id = e.id
+			AND et.tag_id = ANY($` + itoa(argN) + `::uuid[])
+		)`
+		args = append(args, p.TagIDs)
 		argN++
 	}
 	if p.Search != nil {
