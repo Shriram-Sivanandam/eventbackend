@@ -1,0 +1,1 @@
+ALTER TABLE event_registrations ADD COLUMN reminder_sent_at TIMESTAMP NULL;

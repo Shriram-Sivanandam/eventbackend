@@ -10,6 +10,7 @@ import (
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/handlers"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/scheduler"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
@@ -25,6 +26,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer dbPool.Close()
+	
+	scheduler.StartReminderJob(dbPool)
 
 	r2, err := storage.NewR2Client()
 	if err != nil {
@@ -51,6 +54,7 @@ func main() {
 	r.Group(func(protected chi.Router) {
 		protected.Use(middleware.AuthMiddleware)
 		protected.Patch("/auth/me", authHandler.UpdateProfile)
+		protected.Post("/auth/fcm-token", authHandler.SaveFCMToken)
 
 		protected.Post("/events", eventsHandler.CreateEvent)
 

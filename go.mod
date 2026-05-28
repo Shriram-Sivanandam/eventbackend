@@ -4,6 +4,8 @@ go 1.25.5
 
 require github.com/google/uuid v1.6.0
 
+require cloud.google.com/go/compute/metadata v0.3.0 // indirect
+
 require (
 	github.com/aws/aws-sdk-go-v2 v1.41.7 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 // indirect
@@ -32,6 +34,7 @@ require (
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/resend/resend-go/v2 v2.28.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )
