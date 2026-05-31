@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"firebase.google.com/go/v4/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,6 +24,7 @@ import (
 type EventsHandler struct {
 	DB *pgxpool.Pool
 	R2 *storage.R2Client
+	FirebaseAuth *auth.Client
 }
 
 type CreateEventRequest struct {
@@ -505,6 +507,17 @@ func (h *EventsHandler) UpdateRegistrationStatus(w http.ResponseWriter, r *http.
 		http.Error(w, "status must be one of: pending, accepted, rejected", http.StatusBadRequest)
 		return
 	}
+
+	if body.Status == "rejected" {
+    go func() {
+        if err := h.FirebaseAuth.RevokeRefreshTokens(
+            context.Background(),
+            targetUserID.String(),
+        ); err != nil {
+            log.Printf("failed to revoke firebase tokens for %s: %v", targetUserID, err)
+        }
+    }()
+}
  
 	var hostUserID uuid.UUID
 	err = h.DB.QueryRow(r.Context(),

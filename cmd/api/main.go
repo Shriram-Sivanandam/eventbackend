@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	firebase "firebase.google.com/go/v4"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/handlers"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
@@ -14,6 +16,7 @@ import (
 	"github.com/Shriram-Sivanandam/eventbackend/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/joho/godotenv"
+	"google.golang.org/api/option"
 )
 
 func main() {
@@ -34,12 +37,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("connected")
+	opt := option.WithAuthCredentialsFile(option.ServiceAccount, os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+	firebaseApp, err := firebase.NewApp(context.Background(), nil, opt)
+    if err != nil {
+        log.Fatalf("failed to init firebase: %v", err)
+    }
+
+	firebaseAuth, err := firebaseApp.Auth(context.Background())
+    if err != nil {
+        log.Fatalf("failed to init firebase auth: %v", err)
+    }
 
 	authHandler := &handlers.AuthHandler{DB: dbPool, R2: r2}
-	eventsHandler := &handlers.EventsHandler{DB: dbPool, R2: r2}
+	eventsHandler := &handlers.EventsHandler{DB: dbPool, R2: r2, FirebaseAuth: firebaseAuth}
 	usersHandler := &handlers.UsersHandler{DB: dbPool}
 	tagsHandler := &handlers.TagsHandler{DB: dbPool}
+	chatHandler  := &handlers.ChatHandler{DB: dbPool, FirebaseAuth: firebaseAuth}
 
 	r := chi.NewRouter()
 
@@ -63,6 +76,7 @@ func main() {
 		protected.Post("/events/{id}/dismiss-rating-prompt", eventsHandler.DismissRatingPrompt)
 		protected.Patch("/events/{id}/registrations/{userID}", eventsHandler.UpdateRegistrationStatus)
 		protected.Get("/events/{id}/dashboard", eventsHandler.GetEventDashboard)
+		protected.Post("/events/{id}/chat/token", chatHandler.GetChatToken)
 		protected.Get("/events/{id}", eventsHandler.GetEventByID)
 		protected.Get("/events", eventsHandler.GetEvents)
 		protected.Get("/events/registered", eventsHandler.GetRegisteredEvents)
