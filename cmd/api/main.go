@@ -89,6 +89,8 @@ func main() {
 		protected.Get("/tags", tagsHandler.GetTags)
 
 		protected.Get("/auth/me", authHandler.Me)
+
+		protected.Get("/chats", chatHandler.GetChatList)
 	})
 
 	r.Get("/users", func(w http.ResponseWriter, r *http.Request) {
