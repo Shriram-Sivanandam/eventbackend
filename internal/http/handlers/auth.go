@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/auth"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
@@ -211,6 +214,94 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if err := db.UpdateProfile(r.Context(), h.DB, callerID, params); err != nil {
 		http.Error(w, "failed to update profile", http.StatusInternalServerError)
 		return
+	}
+ 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+ 
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+ 
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		http.Error(w, "failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+ 
+	// ── 1. Grab avatar URL before wiping it ──────────────────────────────────
+	var avatarURL *string
+	tx.QueryRow(ctx, `SELECT avatar_url FROM users WHERE id = $1`, callerID).Scan(&avatarURL)
+ 
+	// ── 2. Anonymize the user row ─────────────────────────────────────────────
+	// Replace email with a placeholder so the original email can be re-used
+	// if the person ever signs up again. Everything else is NULLed out.
+	_, err = tx.Exec(ctx, `
+		UPDATE users SET
+			name                = 'deleted_' || id::text || '@deleted.spotlight',
+			email               = 'deleted_' || id::text || '@deleted.spotlight',
+			phone               = NULL,
+			bio                 = NULL,
+			city                = NULL,
+			gender              = NULL,
+			age                 = NULL,
+			date_of_birth       = NULL,
+			avatar_url          = NULL,
+			fcm_token           = NULL,
+			fcm_updated_at      = NULL,
+			onboarding_complete = false,
+			is_anonymized       = true,
+			updated_at          = NOW()
+		WHERE id = $1
+	`, callerID)
+	if err != nil {
+		http.Error(w, "failed to anonymize user", http.StatusInternalServerError)
+		return
+	}
+ 
+	// ── 3. Delete their registrations (as attendee) ───────────────────────────
+	// They shouldn't appear on other events' guest lists
+	_, err = tx.Exec(ctx,
+		`DELETE FROM event_registrations WHERE user_id = $1`, callerID,
+	)
+	if err != nil {
+		http.Error(w, "failed to delete registrations", http.StatusInternalServerError)
+		return
+	}
+ 
+	// ── 5. Delete OTP records ─────────────────────────────────────────────────
+	_, err = tx.Exec(ctx, `
+		DELETE FROM auth_otps
+		WHERE email = (
+			SELECT 'deleted_' || $1::text || '@deleted.spotlight'
+		)
+	`, callerID)
+	if err != nil {
+		// Non-fatal
+		log.Printf("failed to delete OTPs for user %s: %v", callerID, err)
+	}
+ 
+	// ── 6. Commit ─────────────────────────────────────────────────────────────
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "failed to commit", http.StatusInternalServerError)
+		return
+	}
+ 
+	// ── 7. Delete avatar from R2 (after commit — non-fatal if it fails) ───────
+	if avatarURL != nil && h.R2 != nil {
+		key := h.R2.KeyFromURL(*avatarURL)
+		if key != "" {
+			if err := h.R2.Delete(context.Background(), key); err != nil {
+				log.Printf("R2 avatar delete failed for %s: %v", callerID, err)
+			}
+		}
 	}
  
 	w.WriteHeader(http.StatusNoContent)

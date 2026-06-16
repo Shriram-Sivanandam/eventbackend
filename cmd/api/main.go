@@ -89,6 +89,7 @@ func main() {
 		protected.Get("/tags", tagsHandler.GetTags)
 
 		protected.Get("/auth/me", authHandler.Me)
+		protected.Delete("/auth/me", authHandler.DeleteAccount)
 
 		protected.Get("/chats", chatHandler.GetChatList)
 	})
