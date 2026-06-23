@@ -85,10 +85,11 @@ func (h *EventsHandler) SubmitRating(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var eventStart time.Time
+	var hostUserID uuid.UUID
 	err = h.DB.QueryRow(ctx,
-		`SELECT event_start FROM events WHERE id = $1 AND deleted_at IS NULL`,
+		`SELECT event_start, host_user_id FROM events WHERE id = $1 AND deleted_at IS NULL`,
 		eventID,
-	).Scan(&eventStart)
+	).Scan(&eventStart, &hostUserID)
 	if err != nil {
 		http.Error(w, "event not found", http.StatusNotFound)
 		return
@@ -98,17 +99,44 @@ func (h *EventsHandler) SubmitRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var isAttendee bool
-	err = h.DB.QueryRow(ctx, `
-		SELECT EXISTS (
-			SELECT 1 FROM event_registrations
-			WHERE event_id = $1 AND user_id = $2
-			  AND deleted_at IS NULL AND status = 'accepted'
-		)
-	`, eventID, callerID).Scan(&isAttendee)
-	if err != nil || !isAttendee {
-		http.Error(w, "you must be a registered attendee to rate this event", http.StatusForbidden)
-		return
+	switch body.RatingType {
+	case "host":
+		if rateeID != hostUserID {
+			http.Error(w, "ratee_id does not match the event's host", http.StatusBadRequest)
+			return
+		}
+
+		var isAttendee bool
+		err = h.DB.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM event_registrations
+				WHERE event_id = $1 AND user_id = $2
+				  AND deleted_at IS NULL AND status = 'accepted'
+			)
+		`, eventID, callerID).Scan(&isAttendee)
+		if err != nil || !isAttendee {
+			http.Error(w, "you must be a registered attendee to rate the host", http.StatusForbidden)
+			return
+		}
+
+	case "attendee":
+		if callerID != hostUserID {
+			http.Error(w, "only the host can rate attendees", http.StatusForbidden)
+			return
+		}
+
+		var rateeIsAccepted bool
+		err = h.DB.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM event_registrations
+				WHERE event_id = $1 AND user_id = $2
+				  AND deleted_at IS NULL AND status = 'accepted'
+			)
+		`, eventID, rateeID).Scan(&rateeIsAccepted)
+		if err != nil || !rateeIsAccepted {
+			http.Error(w, "the attendee must be an accepted registrant to be rated", http.StatusForbidden)
+			return
+		}
 	}
 
 	if err := db.SubmitRating(ctx, h.DB, eventID, callerID, rateeID, body.RatingType, body.Score, body.Comment, body.Tags); err != nil {

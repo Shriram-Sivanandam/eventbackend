@@ -55,6 +55,7 @@ type Registrant struct {
 	AvatarURL      *string   `json:"avatar_url"`
 	Status         string    `json:"status"`
 	RegisteredAt   string    `json:"registered_at"`
+	HasRated       bool      `json:"has_rated"`
 }
 
 type DashboardStats struct {
@@ -506,7 +507,7 @@ func GetEventDashboard(ctx context.Context, pool *pgxpool.Pool, eventID, callerI
 	if e.HostUserID == nil || *e.HostUserID != callerID {
 		return nil, ErrForbidden
 	}
- 
+
 	rows, err := tx.Query(ctx, `
 		SELECT
 			er.id::text,
@@ -515,13 +516,20 @@ func GetEventDashboard(ctx context.Context, pool *pgxpool.Pool, eventID, callerI
 			u.email,
 			u.avatar_url,
 			er.status,
-			to_char(er.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS registered_at
+			to_char(er.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS registered_at,
+			EXISTS (
+				SELECT 1 FROM event_ratings r
+				WHERE r.event_id    = er.event_id
+				  AND r.rater_id    = $2
+				  AND r.ratee_id    = er.user_id
+				  AND r.rating_type = 'attendee'
+			) AS has_rated
 		FROM event_registrations er
 		INNER JOIN users u ON u.id = er.user_id
 		WHERE er.event_id = $1
 		  AND er.deleted_at IS NULL
 		ORDER BY er.created_at ASC
-	`, eventID)
+	`, eventID, &e.HostUserID)
 	if err != nil {
 		return nil, err
 	}
@@ -540,6 +548,7 @@ func GetEventDashboard(ctx context.Context, pool *pgxpool.Pool, eventID, callerI
 			&r.AvatarURL,
 			&r.Status,
 			&r.RegisteredAt,
+			&r.HasRated,
 		); err != nil {
 			return nil, err
 		}
