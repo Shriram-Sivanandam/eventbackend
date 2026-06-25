@@ -86,12 +86,13 @@ func SubmitRating(
 	_, err := pool.Exec(ctx, `
 		INSERT INTO event_ratings (event_id, rater_id, ratee_id, rating_type, score, comment, tags)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (event_id, rater_id, rating_type)
+		ON CONFLICT (event_id, rater_id, ratee_id, rating_type)
 		DO UPDATE SET
 			score   = EXCLUDED.score,
 			comment = EXCLUDED.comment,
 			tags    = EXCLUDED.tags
 	`, eventID, raterID, rateeID, ratingType, score, comment, tagsStr)
+	
 	return err
 }
 

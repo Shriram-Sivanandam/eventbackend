@@ -1,0 +1,1 @@
+ALTER TABLE event_ratings DROP CONSTRAINT event_ratings_unique_rating;
