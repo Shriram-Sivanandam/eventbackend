@@ -18,6 +18,7 @@ import (
 
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
+	"github.com/Shriram-Sivanandam/eventbackend/internal/notify"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/storage"
 )
 
@@ -543,5 +544,56 @@ func (h *EventsHandler) UpdateRegistrationStatus(w http.ResponseWriter, r *http.
 		return
 	}
  
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *EventsHandler) LeaveEvent(w http.ResponseWriter, r *http.Request) {
+	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid event id", http.StatusBadRequest)
+		return
+	}
+
+	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	err = db.LeaveEvent(r.Context(), h.DB, eventID, callerID)
+	if err != nil {
+		if errors.Is(err, db.ErrNotFound) {
+			http.Error(w, "registration not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "failed to leave event", http.StatusInternalServerError)
+		return
+	}
+
+	go func() {
+		ctx := context.Background()
+
+		hostID, eventTitle, err := db.GetEventHostAndTitle(ctx, h.DB, eventID)
+		if err != nil {
+			log.Printf("failed to get host and title for event %s: %v", eventID, err)
+			return
+		}
+
+		hostToken, err := db.GetFCMToken(ctx, h.DB, hostID)
+		if err != nil || hostToken == "" {
+			log.Printf("failed to get FCM token for host %s: %v", hostID, err)
+			return
+		}
+
+		var attendeeName string
+		err = h.DB.QueryRow(ctx, `SELECT name FROM users WHERE id = $1`, callerID).Scan(&attendeeName)
+		if err != nil {
+			log.Printf("failed to get name for user %s: %v", callerID, err)
+			return
+		}
+
+		notify.Send(ctx, notify.AttendeeLeft(hostToken, attendeeName, eventTitle, eventID.String()))
+	}();
+
 	w.WriteHeader(http.StatusNoContent)
 }

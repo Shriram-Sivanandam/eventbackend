@@ -77,6 +77,7 @@ func main() {
 		protected.Patch("/events/{id}/registrations/{userID}", eventsHandler.UpdateRegistrationStatus)
 		protected.Get("/events/{id}/dashboard", eventsHandler.GetEventDashboard)
 		protected.Post("/events/{id}/chat/token", chatHandler.GetChatToken)
+		protected.Delete("/events/{id}/leave", eventsHandler.LeaveEvent)
 		protected.Get("/events/{id}", eventsHandler.GetEventByID)
 		protected.Get("/events", eventsHandler.GetEvents)
 		protected.Get("/events/registered", eventsHandler.GetRegisteredEvents)
