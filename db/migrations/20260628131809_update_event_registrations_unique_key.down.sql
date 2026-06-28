@@ -1,0 +1,1 @@
+ALTER TABLE event_registrations DROP CONSTRAINT IF EXISTS event_registrations_unique_active;

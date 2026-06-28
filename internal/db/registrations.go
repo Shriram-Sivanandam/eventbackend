@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,7 +12,7 @@ func JoinEvent(ctx context.Context, pool *pgxpool.Pool, eventID, userID uuid.UUI
 	_, err := pool.Exec(ctx, 
 		`INSERT INTO event_registrations (event_id, user_id)
 		VALUES ($1, $2)
-		ON CONFLICT (event_id, user_id) DO NOTHING`,
+		ON CONFLICT (event_id, user_id) WHERE deleted_at IS NULL DO NOTHING`,
 		eventID, userID,
 	)
 
@@ -35,14 +36,14 @@ func UpdateRegistrationStatus(ctx context.Context, pool *pgxpool.Pool, eventID, 
 	return nil
 }
 
-func LeaveEvent(ctx context.Context, pool *pgxpool.Pool, eventID, callerID uuid.UUID) error {
-	tag, err := pool.Exec(ctx,
-		`DELETE FROM event_registrations
-		WHERE event_id = $1
-		  AND user_id = $2
-		  AND deleted_at IS NULL`,
-		eventID, callerID,
-	)
+func LeaveEvent(ctx context.Context, pool *pgxpool.Pool, eventID, userID uuid.UUID) error {
+	tag, err := pool.Exec(ctx, `
+		UPDATE event_registrations
+		SET deleted_at = $1
+		WHERE event_id = $2
+		  AND user_id  = $3
+		  AND deleted_at IS NULL
+	`, time.Now(), eventID, userID)
 	if err != nil {
 		return err
 	}
