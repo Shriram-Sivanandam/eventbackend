@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -60,7 +59,6 @@ func (h *AuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := email.SendOTP(body.Email, otp); err != nil {
 		http.Error(w, "Failed to send OTP email", http.StatusInternalServerError)
-		fmt.Println("Failed to send OTP email:", err)
 		return
 	}
 
@@ -119,13 +117,19 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		ID string `json:"id"`
 		Email string `json:"email"`
 		Name string `json:"name"`
+		Phone *string `json:"phone"`
+		Bio *string `json:"bio"`
+		City *string `json:"city"`
+		DateOfBirth *time.Time `json:"date_of_birth"`
+		Gender *string `json:"gender"`
+		AvatarURL *string `json:"avatar_url"`
 		OnboardingComplete bool `json:"onboarding_complete"`
 	}
 
 	err := h.DB.QueryRow(r.Context(),
-		`SELECT id,email,name,onboarding_complete FROM users WHERE id=$1`,
+		`SELECT id,email,name,phone,bio,city,date_of_birth,gender,avatar_url,onboarding_complete FROM users WHERE id=$1`,
 		userID,
-	).Scan(&user.ID, &user.Email, &user.Name, &user.OnboardingComplete)
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Phone, &user.Bio, &user.City, &user.DateOfBirth, &user.Gender, &user.AvatarURL, &user.OnboardingComplete)
 
 	if err != nil {
 		http.Error(w, "Error occured while selecting user details", http.StatusInternalServerError)
