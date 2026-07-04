@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -34,11 +35,13 @@ func runMigrations(databaseURL string) {
 }
 
 func main() {
-	databaseURL := os.Getenv("DATABASE_URL")
-    runMigrations(databaseURL)
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
+
+	databaseURL := os.Getenv("DATABASE_URL")
+	fmt.Println("Database URL:", databaseURL)
+    runMigrations(databaseURL)
 
 	dbPool, err := db.Connect()
 	if err != nil {
@@ -53,11 +56,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	opt := option.WithAuthCredentialsFile(option.ServiceAccount, os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+	credJSON := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	if credJSON == "" {
+		log.Fatal("GOOGLE_APPLICATION_CREDENTIALS not set")
+	}
+
+	opt := option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(credJSON))
 	firebaseApp, err := firebase.NewApp(context.Background(), nil, opt)
-    if err != nil {
-        log.Fatalf("failed to init firebase: %v", err)
-    }
+	if err != nil {
+		log.Fatalf("failed to init firebase: %v", err)
+	}
 
 	firebaseAuth, err := firebaseApp.Auth(context.Background())
     if err != nil {
