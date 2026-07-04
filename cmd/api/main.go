@@ -15,11 +15,27 @@ import (
 	"github.com/Shriram-Sivanandam/eventbackend/internal/scheduler"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/storage"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
 	"google.golang.org/api/option"
 )
 
+func runMigrations(databaseURL string) {
+    m, err := migrate.New("file://migrations", databaseURL)
+    if err != nil {
+        log.Fatalf("failed to create migrator: %v", err)
+    }
+    if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+        log.Fatalf("migration failed: %v", err)
+    }
+    log.Println("migrations applied successfully")
+}
+
 func main() {
+	databaseURL := os.Getenv("DATABASE_URL")
+    runMigrations(databaseURL)
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
