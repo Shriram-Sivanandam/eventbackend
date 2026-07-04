@@ -23,7 +23,7 @@ import (
 )
 
 func runMigrations(databaseURL string) {
-    m, err := migrate.New("file://migrations", databaseURL)
+    m, err := migrate.New("file://db/migrations", databaseURL)
     if err != nil {
         log.Fatalf("failed to create migrator: %v", err)
     }
