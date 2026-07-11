@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -40,7 +39,6 @@ func main() {
 	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
-	fmt.Println("Database URL:", databaseURL)
     runMigrations(databaseURL)
 
 	dbPool, err := db.Connect()

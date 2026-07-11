@@ -18,7 +18,7 @@ func SendOTP(toEmail string, otp string) error {
 	html := buildOTPEmail(otp)
 
 	params := &resend.SendEmailRequest{
-		From:    "Spotlight <onboarding@resend.dev>", 
+		From:    "Spotlight <noreply@spotlightinfo.in>", 
 		To:      []string{toEmail},
 		Subject: fmt.Sprintf("Your OTP is %s", otp),
 		Html:    html,
