@@ -68,20 +68,21 @@ func (h *AuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
-		OTP string `json:"otp"`
+		OTP   string `json:"otp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
 	}
 
-	json.NewDecoder(r.Body).Decode(&body)
-
-	var hash string
-	if(body.Email == "spotlightinfoapp@gmail.com" && body.OTP == "123456") {
-		hash = "dummyhash"
-	} else {
+	if !(body.Email == "spotlightinfoapp@gmail.com" && body.OTP == "123456") {
+		var hash string
 		err := h.DB.QueryRow(r.Context(),
-		`SELECT otp_hash FROM auth_otps
-		WHERE email = $1 AND expires_at > NOW()
-		ORDER BY created_at DESC LIMIT 1`,
-		body.Email).Scan(&hash)
+			`SELECT otp_hash FROM auth_otps
+			 WHERE email = $1 AND expires_at > NOW()
+			 ORDER BY created_at DESC LIMIT 1`,
+			body.Email,
+		).Scan(&hash)
 
 		if err != nil || !auth.Compare(hash, body.OTP) {
 			http.Error(w, "invalid OTP", http.StatusBadRequest)
@@ -91,20 +92,36 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 
 	var userID string
 	err := h.DB.QueryRow(r.Context(),
-	`INSERT INTO users(email,name)
-	VALUES($1,$1)
-	ON CONFLICT(email) DO UPDATE SET email=EXCLUDED.email
-	RETURNING id`,
-	body.Email).Scan(&userID)
-
-	token, err := auth.CreateJWT(userID)
+		`INSERT INTO users (email, name)
+		 VALUES ($1, $1)
+		 ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+		 RETURNING id`,
+		body.Email,
+	).Scan(&userID)
 	if err != nil {
-		http.Error(w, "Error occured while creating JWT", http.StatusInternalServerError)
+		http.Error(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"token": token,
+	var onboardingComplete bool
+	err = h.DB.QueryRow(r.Context(),
+		`SELECT onboarding_complete FROM users WHERE id = $1`,
+		userID,
+	).Scan(&onboardingComplete)
+	if err != nil {
+		onboardingComplete = false
+	}
+
+	token, err := auth.CreateJWT(userID)
+	if err != nil {
+		http.Error(w, "failed to create token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"token":               token,
+		"onboarding_complete": onboardingComplete,
 	})
 }
 
