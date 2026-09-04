@@ -136,7 +136,7 @@ go run cmd/api/main.go
 
 Interactive API documentation available via Swagger UI:
 
-**Staging:** https://staging-api.spotlightinfo.in/swagger/index.html
+**Staging:** https://eventbackend-staging.up.railway.app/swagger/index.html
 
 ---
 
@@ -175,7 +175,7 @@ Key tables:
 
 The backend is deployed on **Railway** with separate staging and production environments. Migrations run automatically on startup via `golang-migrate`.
 
-- **Staging:** `https://staging-api.spotlightinfo.in`
+- **Staging:** `https://eventbackend-staging.up.railway.app`
 - **Production:** `https://api.spotlightinfo.in`
 
 ---

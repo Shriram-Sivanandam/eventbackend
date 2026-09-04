@@ -38,7 +38,7 @@ func runMigrations(databaseURL string) {
 // @title           Spotlight API
 // @version         1.0
 // @description     REST API for Spotlight — a community events platform
-// @host            staging-api.spotlightinfo.in
+// @host            eventbackend-staging.up.railway.app
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth
 // @in header

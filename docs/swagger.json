@@ -6,7 +6,7 @@
         "contact": {},
         "version": "1.0"
     },
-    "host": "staging-api.spotlightinfo.in",
+    "host": "eventbackend-staging.up.railway.app",
     "basePath": "/",
     "paths": {
         "/auth/fcm-token": {

@@ -168,7 +168,7 @@ definitions:
       name:
         type: string
     type: object
-host: staging-api.spotlightinfo.in
+host: eventbackend-staging.up.railway.app
 info:
   contact: {}
   description: REST API for Spotlight — a community events platform
