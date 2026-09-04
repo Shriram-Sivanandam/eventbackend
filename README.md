@@ -91,7 +91,7 @@ eventbackend/
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/eventbackend.git
+git clone https://github.com/Shriram-Sivanandam/eventbackend.git
 cd eventbackend
 ```
 
