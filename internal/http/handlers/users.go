@@ -18,6 +18,17 @@ type UsersHandler struct {
 	DB *pgxpool.Pool
 }
 
+// GetHostProfile godoc
+// @Summary      Get a host's profile
+// @Description  Returns the profile information of a specific host, including their ID, name, bio, and avatar URL.
+// @Tags         users
+// @Produce      json
+// @Param        id   path      string  true  "Host User ID"
+// @Success      200  {object}  db.HostProfile  "Returns a JSON object containing the host's profile information"
+// @Failure      400  {string}  string  "Invalid user ID"
+// @Failure      404  {string}  string  "User not found"
+// @Failure      500  {string}  string  "Internal Server Error: failed to load profile"
+// @Router       /users/{id}/profile [get]
 func (h *UsersHandler) GetHostProfile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()

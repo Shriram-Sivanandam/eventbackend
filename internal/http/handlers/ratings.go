@@ -13,7 +13,15 @@ import (
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
 )
 
-// GET /events/unrated
+// GetUnratedEvents godoc
+// @Summary      Get unrated events for the authenticated user
+// @Description  Returns a list of events that the currently authenticated user has attended but not yet rated. This allows users to provide feedback on events they have participated in.
+// @Tags         ratings
+// @Produce      json
+// @Success      200  {object}  map[string][]db.Event  "Returns a JSON object containing a list of unrated events"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      500  {string}  string  "Internal Server Error: failed to fetch unrated events"
+// @Router       /events/unrated [get]
 func (h *EventsHandler) GetUnratedEvents(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -37,7 +45,21 @@ func (h *EventsHandler) GetUnratedEvents(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// POST /events/:id/rate
+// SubmitRating godoc
+// @Summary      Submit a rating for an event
+// @Description  Allows the currently authenticated user to submit a rating for another user (either the host or an attendee) of a specific event. The rating includes a score, optional comment, and optional tags.
+// @Tags         ratings
+// @Accept       json
+// @Produce      json
+// @Param        id    path      string  true  "Event ID"
+// @Param        body  body      map[string]interface{}  true  "Request body containing ratee_id, rating_type, score, comment, and tags"
+// @Success      204   {string}  string  "No Content: rating submitted successfully"
+// @Failure      400   {string}  string  "Bad Request: invalid input or constraints not met"
+// @Failure      401   {string}  string  "Unauthorized: user not authenticated"
+// @Failure      403   {string}  string  "Forbidden: user not allowed to rate the specified user"
+// @Failure      404   {string}  string  "Not Found: event not found"
+// @Failure      500   {string}  string  "Internal Server Error: failed to submit rating"
+// @Router       /events/{id}/rate [post]
 func (h *EventsHandler) SubmitRating(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -147,7 +169,17 @@ func (h *EventsHandler) SubmitRating(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// POST /events/{id}/dismiss-rating-prompt
+// DismissRatingPrompt godoc
+// @Summary      Dismiss the rating prompt for an event
+// @Description  Allows the currently authenticated user to dismiss the rating prompt for a specific event. This indicates that the user does not wish to provide a rating for that event at this time.
+// @Tags         ratings
+// @Produce      json
+// @Param        id    path      string  true  "Event ID"
+// @Success      204   {string}  string  "No Content: rating prompt dismissed successfully"
+// @Failure      400   {string}  string  "Bad Request: invalid event ID"
+// @Failure      401   {string}  string  "Unauthorized: user not authenticated"
+// @Failure      500   {string}  string  "Internal Server Error: failed to dismiss rating prompt"
+// @Router       /events/{id}/dismiss-rating-prompt [post]
 func (h *EventsHandler) DismissRatingPrompt(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()

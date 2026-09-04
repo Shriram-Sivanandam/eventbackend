@@ -18,7 +18,14 @@ type Tag struct {
 	Name string `json:"name"`
 }
  
-// GET /tags
+// GetTags godoc
+// @Summary      Get a list of tags
+// @Description  Returns a list of all available tags in the system. Each tag includes its ID and name.
+// @Tags         tags
+// @Produce      json
+// @Success      200  {object}  map[string][]Tag  "Returns a JSON object containing a list of tags"
+// @Failure      500  {string}  string  "Internal Server Error: failed to fetch tags"
+// @Router       /tags [get]
 func (h *TagsHandler) GetTags(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()

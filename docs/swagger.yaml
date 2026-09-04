@@ -1,0 +1,1070 @@
+basePath: /
+definitions:
+  db.Event:
+    properties:
+      address_line_one:
+        type: string
+      capacity:
+        type: integer
+      city:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      duration_minutes:
+        type: integer
+      event_end:
+        type: string
+      event_start:
+        type: string
+      has_rated:
+        type: boolean
+      host_page_id:
+        type: string
+      host_user_id:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      joined:
+        type: boolean
+      location:
+        type: string
+      maps_link:
+        type: string
+      pincode:
+        type: string
+      price:
+        type: integer
+      registrant_count:
+        type: integer
+      tags:
+        items:
+          $ref: '#/definitions/db.EventTag'
+        type: array
+      things_provided:
+        type: string
+      things_to_bring:
+        type: string
+      title:
+        type: string
+    type: object
+  db.EventDashboard:
+    properties:
+      accepted:
+        type: integer
+      event:
+        $ref: '#/definitions/db.Event'
+      pending:
+        type: integer
+      registrants:
+        items:
+          $ref: '#/definitions/db.Registrant'
+        type: array
+      rejected:
+        type: integer
+      total_registered:
+        type: integer
+    type: object
+  db.EventTag:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  db.HostProfile:
+    properties:
+      age:
+        type: integer
+      attendee_rating:
+        type: number
+      avatar_url:
+        type: string
+      bio:
+        type: string
+      city:
+        type: string
+      email:
+        type: string
+      gender:
+        type: string
+      hosting_rating:
+        type: number
+      name:
+        type: string
+      past_events:
+        items:
+          $ref: '#/definitions/db.HostedEvent'
+        type: array
+      total_attended:
+        type: integer
+      total_hosted:
+        type: integer
+      total_ratings:
+        type: integer
+      user_id:
+        type: string
+    type: object
+  db.HostedEvent:
+    properties:
+      avg_rating:
+        type: number
+      city:
+        type: string
+      event_start:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      location:
+        type: string
+      price:
+        type: integer
+      rating_count:
+        type: integer
+      title:
+        type: string
+    type: object
+  db.Registrant:
+    properties:
+      avatar_url:
+        type: string
+      email:
+        type: string
+      has_rated:
+        type: boolean
+      name:
+        type: string
+      registered_at:
+        type: string
+      registration_id:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+    type: object
+  handlers.ChatListEvent:
+    properties:
+      event_start:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      is_host:
+        type: boolean
+      title:
+        type: string
+    type: object
+  handlers.Tag:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+host: staging-api.spotlightinfo.in
+info:
+  contact: {}
+  description: REST API for Spotlight — a community events platform
+  title: Spotlight API
+  version: "1.0"
+paths:
+  /auth/fcm-token:
+    post:
+      consumes:
+      - application/json
+      description: Saves the provided FCM token for the currently authenticated user.
+        This token can be used to send push notifications to the user's device.
+      parameters:
+      - description: Request body containing the FCM token
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: 'No Content: token saved successfully'
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid request body or missing token'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to save token'
+          schema:
+            type: string
+      summary: Save a Firebase Cloud Messaging (FCM) token for the authenticated user
+      tags:
+      - auth
+  /auth/me:
+    delete:
+      description: Anonymizes the currently authenticated user's account and removes
+        associated data
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Failed to anonymize user" or "Failed to delete registrations"
+            or "Failed to commit
+          schema:
+            type: string
+      summary: Delete current user account
+      tags:
+      - auth
+    get:
+      description: Retrieves the profile information of the currently authenticated
+        user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing the user's profile information
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Error occurred while selecting user details
+          schema:
+            type: string
+      summary: Get current user profile
+      tags:
+      - auth
+    patch:
+      consumes:
+      - multipart/form-data
+      description: Updates the profile information of the currently authenticated
+        user
+      parameters:
+      - description: Name
+        in: formData
+        name: name
+        type: string
+      - description: Phone
+        in: formData
+        name: phone
+        type: string
+      - description: Bio
+        in: formData
+        name: bio
+        type: string
+      - description: City
+        in: formData
+        name: city
+        type: string
+      - description: Date of Birth (YYYY-MM-DD)
+        in: formData
+        name: date_of_birth
+        type: string
+      - description: Gender (male, female, non_binary, prefer_not_to_say)
+        in: formData
+        name: gender
+        type: string
+      - description: Age (13-120)
+        in: formData
+        name: age
+        type: integer
+      - description: Onboarding Complete
+        in: formData
+        name: onboarding
+        type: boolean
+      - description: Avatar Image
+        in: formData
+        name: avatar
+        type: file
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid form data" or "Invalid gender value" or "Age must be
+            between 13 and 120
+          schema:
+            type: string
+        "500":
+          description: Failed to update profile" or "Failed to read avatar" or "Failed
+            to upload avatar
+          schema:
+            type: string
+      summary: Update current user profile
+      tags:
+      - auth
+  /auth/request-otp:
+    post:
+      consumes:
+      - application/json
+      description: Sends an OTP to the provided email address for authentication
+      parameters:
+      - description: Request body containing the email address
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid json" or "Email required
+          schema:
+            type: string
+        "500":
+          description: Error in hashing" or "Inserting OTP failed" or "Failed to send
+            OTP email
+          schema:
+            type: string
+      summary: Request OTP for email login
+      tags:
+      - auth
+  /auth/verify-otp:
+    post:
+      consumes:
+      - application/json
+      description: Verifies the provided OTP for the given email address and returns
+        a JWT token if successful
+      parameters:
+      - description: Request body containing the email address and OTP
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT token and onboarding status
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request body" or "Invalid OTP
+          schema:
+            type: string
+        "500":
+          description: Failed to create user" or "Failed to create token
+          schema:
+            type: string
+      summary: Verify OTP for email login
+      tags:
+      - auth
+  /chats:
+    get:
+      description: Returns a list of events that the currently authenticated user
+        is either hosting or attending. Each event includes its ID, title, image URL,
+        start time, and whether the user is the host.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing a list of chat events
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/handlers.ChatListEvent'
+              type: array
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to fetch chats'
+          schema:
+            type: string
+      summary: Get a list of chats for the authenticated user
+      tags:
+      - chat
+  /chats/{id}/token:
+    get:
+      description: Returns a Firebase custom token for the currently authenticated
+        user to access the chat for a specific event. The user must be either the
+        host or an accepted attendee of the event.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing the chat token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid event ID
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "403":
+          description: 'Forbidden: user is not an accepted attendee or host'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to create chat token'
+          schema:
+            type: string
+      summary: Get a chat token for an event
+      tags:
+      - chat
+  /events:
+    get:
+      description: Returns a list of events based on the provided query parameters.
+        Supports filtering by host user ID, page ID, date range, city, tags, and search
+        term. Pagination is supported via limit and offset.
+      parameters:
+      - description: Filter by host user ID
+        in: query
+        name: host_user_id
+        type: string
+      - description: Filter by page ID
+        in: query
+        name: page_id
+        type: string
+      - description: Filter events starting from this date (RFC3339 format)
+        in: query
+        name: from
+        type: string
+      - description: Filter events ending before this date (RFC3339 format)
+        in: query
+        name: to
+        type: string
+      - description: Filter by city
+        in: query
+        name: city
+        type: string
+      - collectionFormat: csv
+        description: Filter by tag IDs (can be specified multiple times)
+        in: query
+        items:
+          type: string
+        name: tag_id
+        type: array
+      - description: Search term for event title or description
+        in: query
+        name: search
+        type: string
+      - description: 'Number of events to return (default: 10)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Number of events to skip for pagination (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing a list of events and the count
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/db.Event'
+              type: array
+            type: object
+        "400":
+          description: 'Bad Request: invalid query parameters'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to fetch events'
+          schema:
+            type: string
+      summary: Get a list of events
+      tags:
+      - events
+    post:
+      consumes:
+      - multipart/form-data
+      description: Creates a new event with the provided details. The authenticated
+        user will be set as the host of the event.
+      parameters:
+      - description: Event title
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Event description
+        in: formData
+        name: description
+        type: string
+      - description: Event location
+        in: formData
+        name: location
+        type: string
+      - description: Event start time (RFC3339 format)
+        in: formData
+        name: event_start
+        required: true
+        type: string
+      - description: Event end time (RFC3339 format)
+        in: formData
+        name: event_end
+        type: string
+      - description: Event price
+        in: formData
+        name: price
+        type: integer
+      - description: Event capacity
+        in: formData
+        name: capacity
+        type: integer
+      - description: City where the event is held
+        in: formData
+        name: city
+        type: string
+      - description: Address line one
+        in: formData
+        name: address_line_one
+        type: string
+      - description: Pincode
+        in: formData
+        name: pincode
+        type: string
+      - description: Google Maps link
+        in: formData
+        name: maps_link
+        type: string
+      - description: Event duration in minutes
+        in: formData
+        name: duration_minutes
+        type: integer
+      - description: Things attendees should bring
+        in: formData
+        name: things_to_bring
+        type: string
+      - description: Things provided by the host
+        in: formData
+        name: things_provided
+        type: string
+      - description: Event image file
+        in: formData
+        name: image
+        type: file
+      - collectionFormat: csv
+        description: List of tag IDs associated with the event
+        in: formData
+        items:
+          type: string
+        name: tag_ids
+        type: array
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/db.Event'
+        "400":
+          description: 'Bad Request: invalid input data'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to create event'
+          schema:
+            type: string
+      summary: Create a new event
+      tags:
+      - events
+  /events/{id}:
+    get:
+      description: Returns the details of a specific event by its ID. The authenticated
+        user must be either the host or an accepted attendee of the event.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns the event details
+          schema:
+            $ref: '#/definitions/db.Event'
+        "400":
+          description: 'Bad Request: invalid event ID'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "403":
+          description: 'Forbidden: user is not authorized to view this event'
+          schema:
+            type: string
+        "404":
+          description: 'Not Found: event does not exist'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to fetch event'
+          schema:
+            type: string
+      summary: Get event details by ID
+      tags:
+      - events
+  /events/{id}/cancel:
+    post:
+      description: Cancels a specific event if the authenticated user is the host.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Successfully cancelled the event
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid event ID'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "403":
+          description: 'Forbidden: user is not authorized to cancel this event'
+          schema:
+            type: string
+        "404":
+          description: 'Not Found: event does not exist'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to cancel event'
+          schema:
+            type: string
+      summary: Cancel an event
+      tags:
+      - events
+  /events/{id}/dashboard:
+    get:
+      description: Returns the dashboard data for a specific event. Only the host
+        of the event can access this endpoint.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns the event dashboard data
+          schema:
+            $ref: '#/definitions/db.EventDashboard'
+        "400":
+          description: 'Bad Request: invalid event ID'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "403":
+          description: 'Forbidden: only the host can view the dashboard'
+          schema:
+            type: string
+        "404":
+          description: 'Not Found: event does not exist'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to load dashboard'
+          schema:
+            type: string
+      summary: Get event dashboard
+      tags:
+      - events
+  /events/{id}/dismiss-rating-prompt:
+    post:
+      description: Allows the currently authenticated user to dismiss the rating prompt
+        for a specific event. This indicates that the user does not wish to provide
+        a rating for that event at this time.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: 'No Content: rating prompt dismissed successfully'
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid event ID'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to dismiss rating prompt'
+          schema:
+            type: string
+      summary: Dismiss the rating prompt for an event
+      tags:
+      - ratings
+  /events/{id}/join:
+    post:
+      description: Adds the authenticated user to the list of attendees for a specific
+        event.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Successfully joined the event
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid event ID'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "403":
+          description: 'Forbidden: user is not authorized to join this event'
+          schema:
+            type: string
+        "404":
+          description: 'Not Found: event does not exist'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to join event'
+          schema:
+            type: string
+      summary: Join an event
+      tags:
+      - events
+  /events/{id}/leave:
+    post:
+      description: Allows the authenticated user to leave a specific event they are
+        registered for.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Successfully left the event
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid event ID'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "404":
+          description: 'Not Found: registration does not exist'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to leave event'
+          schema:
+            type: string
+      summary: Leave an event
+      tags:
+      - events
+  /events/{id}/rate:
+    post:
+      consumes:
+      - application/json
+      description: Allows the currently authenticated user to submit a rating for
+        another user (either the host or an attendee) of a specific event. The rating
+        includes a score, optional comment, and optional tags.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Request body containing ratee_id, rating_type, score, comment,
+          and tags
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: 'No Content: rating submitted successfully'
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid input or constraints not met'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "403":
+          description: 'Forbidden: user not allowed to rate the specified user'
+          schema:
+            type: string
+        "404":
+          description: 'Not Found: event not found'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to submit rating'
+          schema:
+            type: string
+      summary: Submit a rating for an event
+      tags:
+      - ratings
+  /events/{id}/registrations/{userID}:
+    put:
+      consumes:
+      - application/json
+      description: Updates the registration status (pending, accepted, rejected) for
+        a specific user attending an event. Only the host of the event can perform
+        this action.
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID of the attendee
+        in: path
+        name: userID
+        required: true
+        type: string
+      - description: JSON body containing the new status
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Successfully updated registration status
+          schema:
+            type: string
+        "400":
+          description: 'Bad Request: invalid input data'
+          schema:
+            type: string
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "403":
+          description: 'Forbidden: only the host can manage registrations'
+          schema:
+            type: string
+        "404":
+          description: 'Not Found: event or registration does not exist'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to update registration status'
+          schema:
+            type: string
+      summary: Update registration status for an event attendee
+      tags:
+      - events
+  /events/registered:
+    get:
+      description: Returns a list of events that the currently authenticated user
+        is registered for, either as a host or an accepted attendee.
+      parameters:
+      - description: 'Number of events to return (default: 20)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Number of events to skip for pagination (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing a list of registered events
+            and the count
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/db.Event'
+              type: array
+            type: object
+        "401":
+          description: 'Unauthorized: user not authenticated'
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to fetch registered events'
+          schema:
+            type: string
+      summary: Get a list of events the user is registered for
+      tags:
+      - events
+  /events/unrated:
+    get:
+      description: Returns a list of events that the currently authenticated user
+        has attended but not yet rated. This allows users to provide feedback on events
+        they have participated in.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing a list of unrated events
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/db.Event'
+              type: array
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to fetch unrated events'
+          schema:
+            type: string
+      summary: Get unrated events for the authenticated user
+      tags:
+      - ratings
+  /tags:
+    get:
+      description: Returns a list of all available tags in the system. Each tag includes
+        its ID and name.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing a list of tags
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/handlers.Tag'
+              type: array
+            type: object
+        "500":
+          description: 'Internal Server Error: failed to fetch tags'
+          schema:
+            type: string
+      summary: Get a list of tags
+      tags:
+      - tags
+  /users/{id}/profile:
+    get:
+      description: Returns the profile information of a specific host, including their
+        ID, name, bio, and avatar URL.
+      parameters:
+      - description: Host User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Returns a JSON object containing the host's profile information
+          schema:
+            $ref: '#/definitions/db.HostProfile'
+        "400":
+          description: Invalid user ID
+          schema:
+            type: string
+        "404":
+          description: User not found
+          schema:
+            type: string
+        "500":
+          description: 'Internal Server Error: failed to load profile'
+          schema:
+            type: string
+      summary: Get a host's profile
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

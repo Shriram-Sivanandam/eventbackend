@@ -63,6 +63,33 @@ func intPtrOrNil(s string) *int {
 	return &v
 }
 
+// CreateEvent godoc
+// @Summary      Create a new event
+// @Description  Creates a new event with the provided details. The authenticated user will be set as the host of the event.
+// @Tags         events
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        title              formData  string  true   "Event title"
+// @Param        description        formData  string  false  "Event description"
+// @Param        location           formData  string  false  "Event location"
+// @Param        event_start        formData  string  true   "Event start time (RFC3339 format)"
+// @Param        event_end          formData  string  false  "Event end time (RFC3339 format)"
+// @Param        price              formData  int     false  "Event price"
+// @Param        capacity           formData  int     false  "Event capacity"
+// @Param        city               formData  string  false  "City where the event is held"
+// @Param        address_line_one   formData  string  false  "Address line one"
+// @Param        pincode            formData  string  false  "Pincode"
+// @Param        maps_link          formData  string  false  "Google Maps link"
+// @Param        duration_minutes   formData  int     false  "Event duration in minutes"
+// @Param        things_to_bring    formData  string  false  "Things attendees should bring"
+// @Param        things_provided    formData  string  false  "Things provided by the host"
+// @Param        image              formData  file    false  "Event image file"
+// @Param        tag_ids            formData  []string false "List of tag IDs associated with the event"
+// @Success      201                {object}  db.Event
+// @Failure      400                {string}  string  "Bad Request: invalid input data"
+// @Failure      401                {string}  string  "Unauthorized: user not authenticated"
+// @Failure      500                {string}  string  "Internal Server Error: failed to create event"
+// @Router       /events [post]
 func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 
@@ -207,6 +234,24 @@ func (h *EventsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(created)
 }
 
+// GetEvents godoc
+// @Summary      Get a list of events
+// @Description  Returns a list of events based on the provided query parameters. Supports filtering by host user ID, page ID, date range, city, tags, and search term. Pagination is supported via limit and offset.
+// @Tags         events
+// @Produce      json
+// @Param        host_user_id  query     string  false  "Filter by host user ID"
+// @Param        page_id       query     string  false  "Filter by page ID"
+// @Param        from          query     string  false  "Filter events starting from this date (RFC3339 format)"
+// @Param        to            query     string  false  "Filter events ending before this date (RFC3339 format)"
+// @Param        city          query     string  false  "Filter by city"
+// @Param        tag_id        query     []string false "Filter by tag IDs (can be specified multiple times)"
+// @Param        search		   query     string  false  "Search term for event title or description"
+// @Param        limit         query     int     false  "Number of events to return (default: 10)"
+// @Param        offset        query     int     false  "Number of events to skip for pagination (default: 0)"
+// @Success      200           {object}  map[string][]db.Event  "Returns a JSON object containing a list of events and the count"
+// @Failure      400           {string}  string  "Bad Request: invalid query parameters"
+// @Failure      500           {string}  string  "Internal Server Error: failed to fetch events"
+// @Router       /events [get]
 func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
@@ -320,7 +365,19 @@ func (h *EventsHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /events/{id}
+// GetEventByID godoc
+// @Summary      Get event details by ID
+// @Description  Returns the details of a specific event by its ID. The authenticated user must be either the host or an accepted attendee of the event.
+// @Tags         events
+// @Produce      json
+// @Param        id   path      string  true  "Event ID"
+// @Success      200  {object}  db.Event  "Returns the event details"
+// @Failure      400  {string}  string  "Bad Request: invalid event ID"
+// @Failure      401  {string}  string  "Unauthorized: user not authenticated"
+// @Failure      403  {string}  string  "Forbidden: user is not authorized to view this event"
+// @Failure      404  {string}  string  "Not Found: event does not exist"
+// @Failure      500  {string}  string  "Internal Server Error: failed to fetch event"
+// @Router       /events/{id} [get]
 func (h *EventsHandler) GetEventByID(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -351,6 +408,19 @@ func (h *EventsHandler) GetEventByID(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(event)
 }
 
+// JoinEvent godoc
+// @Summary      Join an event
+// @Description  Adds the authenticated user to the list of attendees for a specific event.
+// @Tags         events
+// @Produce      json
+// @Param        id   path      string  true  "Event ID"
+// @Success      204  {string}  string  "Successfully joined the event"
+// @Failure      400  {string}  string  "Bad Request: invalid event ID"
+// @Failure      401  {string}  string  "Unauthorized: user not authenticated"
+// @Failure      403  {string}  string  "Forbidden: user is not authorized to join this event"
+// @Failure      404  {string}  string  "Not Found: event does not exist"
+// @Failure      500  {string}  string  "Internal Server Error: failed to join event"
+// @Router       /events/{id}/join [post]
 func (h *EventsHandler) JoinEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -377,6 +447,19 @@ func (h *EventsHandler) JoinEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// CancelEvent godoc
+// @Summary      Cancel an event
+// @Description  Cancels a specific event if the authenticated user is the host.
+// @Tags         events
+// @Produce      json
+// @Param        id   path      string  true  "Event ID"
+// @Success      204  {string}  string  "Successfully cancelled the event"
+// @Failure      400  {string}  string  "Bad Request: invalid event ID"
+// @Failure      401  {string}  string  "Unauthorized: user not authenticated"
+// @Failure      403  {string}  string  "Forbidden: user is not authorized to cancel this event"
+// @Failure      404  {string}  string  "Not Found: event does not exist"
+// @Failure      500  {string}  string  "Internal Server Error: failed to cancel event"
+// @Router       /events/{id}/cancel [post]
 func (h *EventsHandler) CancelEvent(w http.ResponseWriter, r *http.Request) {
 	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -408,6 +491,17 @@ func (h *EventsHandler) CancelEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GetRegisteredEvents godoc
+// @Summary      Get a list of events the user is registered for
+// @Description  Returns a list of events that the currently authenticated user is registered for, either as a host or an accepted attendee.
+// @Tags         events
+// @Produce      json
+// @Param        limit   query     int     false  "Number of events to return (default: 20)"
+// @Param        offset  query     int     false  "Number of events to skip for pagination (default: 0)"
+// @Success      200     {object}  map[string][]db.Event  "Returns a JSON object containing a list of registered events and the count"
+// @Failure      401     {string}  string  "Unauthorized: user not authenticated"
+// @Failure      500     {string}  string  "Internal Server Error: failed to fetch registered events"
+// @Router       /events/registered [get]
 func (h *EventsHandler) GetRegisteredEvents(w http.ResponseWriter, r *http.Request) {
 	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
 	if err != nil {
@@ -444,6 +538,19 @@ func (h *EventsHandler) GetRegisteredEvents(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// GetEventDashboard godoc
+// @Summary      Get event dashboard
+// @Description  Returns the dashboard data for a specific event. Only the host of the event can access this endpoint.
+// @Tags         events
+// @Produce      json
+// @Param        id   path      string  true  "Event ID"
+// @Success      200  {object}  db.EventDashboard  "Returns the event dashboard data"
+// @Failure      400  {string}  string  "Bad Request: invalid event ID"
+// @Failure      401  {string}  string  "Unauthorized: user not authenticated"
+// @Failure      403  {string}  string  "Forbidden: only the host can view the dashboard"
+// @Failure      404  {string}  string  "Not Found: event does not exist"
+// @Failure      500  {string}  string  "Internal Server Error: failed to load dashboard"
+// @Router       /events/{id}/dashboard [get]
 func (h *EventsHandler) GetEventDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -476,6 +583,22 @@ func (h *EventsHandler) GetEventDashboard(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(dashboard)
 }
 
+// UpdateRegistrationStatus godoc
+// @Summary      Update registration status for an event attendee
+// @Description  Updates the registration status (pending, accepted, rejected) for a specific user attending an event. Only the host of the event can perform this action.
+// @Tags         events
+// @Accept       json
+// @Produce      json
+// @Param        id       path      string  true  "Event ID"
+// @Param        userID   path      string  true  "User ID of the attendee"
+// @Param        body     body      map[string]string  true  "JSON body containing the new status" 
+// @Success      204      {string}  string  "Successfully updated registration status"
+// @Failure      400      {string}  string  "Bad Request: invalid input data"
+// @Failure      401      {string}  string  "Unauthorized: user not authenticated"
+// @Failure      403      {string}  string  "Forbidden: only the host can manage registrations"
+// @Failure      404      {string}  string  "Not Found: event or registration does not exist"
+// @Failure      500      {string}  string  "Internal Server Error: failed to update registration status"
+// @Router       /events/{id}/registrations/{userID} [put]
 func (h *EventsHandler) UpdateRegistrationStatus(w http.ResponseWriter, r *http.Request) {
 	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -510,15 +633,15 @@ func (h *EventsHandler) UpdateRegistrationStatus(w http.ResponseWriter, r *http.
 	}
 
 	if body.Status == "rejected" {
-    go func() {
-        if err := h.FirebaseAuth.RevokeRefreshTokens(
-            context.Background(),
-            targetUserID.String(),
-        ); err != nil {
-            log.Printf("failed to revoke firebase tokens for %s: %v", targetUserID, err)
-        }
-    }()
-}
+		go func() {
+			if err := h.FirebaseAuth.RevokeRefreshTokens(
+				context.Background(),
+				targetUserID.String(),
+			); err != nil {
+				log.Printf("failed to revoke firebase tokens for %s: %v", targetUserID, err)
+			}
+		}()
+	}
  
 	var hostUserID uuid.UUID
 	err = h.DB.QueryRow(r.Context(),
@@ -547,6 +670,18 @@ func (h *EventsHandler) UpdateRegistrationStatus(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// LeaveEvent godoc
+// @Summary      Leave an event
+// @Description  Allows the authenticated user to leave a specific event they are registered for.
+// @Tags         events
+// @Produce      json
+// @Param        id   path      string  true  "Event ID"
+// @Success      204  {string}  string  "Successfully left the event"
+// @Failure      400  {string}  string  "Bad Request: invalid event ID"
+// @Failure      401  {string}  string  "Unauthorized: user not authenticated"
+// @Failure      404  {string}  string  "Not Found: registration does not exist"
+// @Failure      500  {string}  string  "Internal Server Error: failed to leave event"
+// @Router       /events/{id}/leave [post]
 func (h *EventsHandler) LeaveEvent(w http.ResponseWriter, r *http.Request) {
 	eventID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {

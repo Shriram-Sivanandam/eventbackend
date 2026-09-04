@@ -19,7 +19,18 @@ type ChatHandler struct {
 	FirebaseAuth *auth.Client
 }
 
-// POST /events/{id}/chat/token
+// GetChatToken godoc
+// @Summary      Get a chat token for an event
+// @Description  Returns a Firebase custom token for the currently authenticated user to access the chat for a specific event. The user must be either the host or an accepted attendee of the event.
+// @Tags         chat
+// @Produce      json
+// @Param        id   path      string  true  "Event ID"
+// @Success      200  {object}  map[string]string  "Returns a JSON object containing the chat token"
+// @Failure      400  {string}  string  "Invalid event ID"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      403  {string}  string  "Forbidden: user is not an accepted attendee or host"
+// @Failure      500  {string}  string  "Internal Server Error: failed to create chat token"
+// @Router       /chats/{id}/token [get]
 func (h *ChatHandler) GetChatToken(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -73,7 +84,15 @@ type ChatListEvent struct {
 	IsHost    bool       `json:"is_host"`
 }
 
-// GET /chats
+// GetChatList godoc
+// @Summary      Get a list of chats for the authenticated user
+// @Description  Returns a list of events that the currently authenticated user is either hosting or attending. Each event includes its ID, title, image URL, start time, and whether the user is the host.
+// @Tags         chat
+// @Produce      json
+// @Success      200  {object}  map[string][]ChatListEvent  "Returns a JSON object containing a list of chat events"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      500  {string}  string  "Internal Server Error: failed to fetch chats"
+// @Router       /chats [get]
 func (h *ChatHandler) GetChatList(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()

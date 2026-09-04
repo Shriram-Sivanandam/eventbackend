@@ -9,6 +9,7 @@ import (
 	"time"
 
 	firebase "firebase.google.com/go/v4"
+	_ "github.com/Shriram-Sivanandam/eventbackend/docs"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/db"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/handlers"
 	"github.com/Shriram-Sivanandam/eventbackend/internal/http/middleware"
@@ -19,6 +20,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/api/option"
 )
 
@@ -33,6 +35,14 @@ func runMigrations(databaseURL string) {
     log.Println("migrations applied successfully")
 }
 
+// @title           Spotlight API
+// @version         1.0
+// @description     REST API for Spotlight — a community events platform
+// @host            staging-api.spotlightinfo.in
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
@@ -85,6 +95,8 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
+
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	r.Group(func(protected chi.Router) {
 		protected.Use(middleware.AuthMiddleware)

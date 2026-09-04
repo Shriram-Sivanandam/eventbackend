@@ -24,6 +24,17 @@ type AuthHandler struct {
 	R2 *storage.R2Client
 }
 
+// RequestOTP godoc
+// @Summary      Request OTP for email login
+// @Description  Sends an OTP to the provided email address for authentication
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      map[string]string  true  "Request body containing the email address"
+// @Success      204  "No Content"
+// @Failure      400  {string}  string  "Invalid json" or "Email required"
+// @Failure      500  {string}  string  "Error in hashing" or "Inserting OTP failed" or "Failed to send OTP email"
+// @Router       /auth/request-otp [post]
 func (h *AuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
@@ -65,6 +76,17 @@ func (h *AuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+//VerifyOTP godoc
+// @Summary      Verify OTP for email login
+// @Description  Verifies the provided OTP for the given email address and returns a JWT token if successful
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body     map[string]string  true  "Request body containing the email address and OTP"
+// @Success      200  {object}  map[string]interface{}  "JWT token and onboarding status"
+// @Failure      400  {string}  string  "Invalid request body" or "Invalid OTP"
+// @Failure      500  {string}  string  "Failed to create user" or "Failed to create token"
+// @Router       /auth/verify-otp [post]
 func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
@@ -125,6 +147,15 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Me godoc
+// @Summary      Get current user profile
+// @Description  Retrieves the profile information of the currently authenticated user
+// @Tags         auth
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}  "Returns a JSON object containing the user's profile information"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      500  {string}  string  "Error occurred while selecting user details"
+// @Router       /auth/me [get]
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userIDVal := r.Context().Value(middleware.UserIDKey);
 	if userIDVal == nil {
@@ -168,6 +199,25 @@ var validGenders = map[string]bool{
 	"prefer_not_to_say": true,
 }
 
+// UpdateProfile godoc
+// @Summary      Update current user profile
+// @Description  Updates the profile information of the currently authenticated user
+// @Tags         auth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        name  formData  string  false  "Name"
+// @Param        phone  formData  string  false  "Phone"
+// @Param        bio  formData  string  false  "Bio"
+// @Param        city  formData  string  false  "City"
+// @Param        date_of_birth  formData  string  false  "Date of Birth (YYYY-MM-DD)"
+// @Param        gender  formData  string  false  "Gender (male, female, non_binary, prefer_not_to_say)"
+// @Param        age  formData  int  false  "Age (13-120)"
+// @Param        onboarding  formData  bool  false  "Onboarding Complete"
+// @Param        avatar  formData  file  false  "Avatar Image"
+// @Success      204  "No Content"
+// @Failure      400  {string}  string  "Invalid form data" or "Invalid gender value" or "Age must be between 13 and 120"
+// @Failure      500  {string}  string  "Failed to update profile" or "Failed to read avatar" or "Failed to upload avatar"
+// @Router       /auth/me [patch]
 func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	callerID, err := uuid.Parse(r.Context().Value(middleware.UserIDKey).(string))
 	if err != nil {
@@ -192,7 +242,6 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		params.OnboardingComplete = &t
 	}
  
-	// Gender
 	if g := r.FormValue("gender"); g != "" {
 		if !validGenders[g] {
 			http.Error(w, "invalid gender value", http.StatusBadRequest)
@@ -244,6 +293,15 @@ func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// DeleteAccount godoc
+// @Summary      Delete current user account
+// @Description  Anonymizes the currently authenticated user's account and removes associated data
+// @Tags         auth
+// @Produce      json
+// @Success      204  "No Content"
+// @Failure      401  {string}  string  "Unauthorized"
+// @Failure      500  {string}  string  "Failed to anonymize user" or "Failed to delete registrations" or "Failed to commit"
+// @Router       /auth/me [delete]
 func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -261,13 +319,9 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
  
-	// ── 1. Grab avatar URL before wiping it ──────────────────────────────────
 	var avatarURL *string
 	tx.QueryRow(ctx, `SELECT avatar_url FROM users WHERE id = $1`, callerID).Scan(&avatarURL)
  
-	// ── 2. Anonymize the user row ─────────────────────────────────────────────
-	// Replace email with a placeholder so the original email can be re-used
-	// if the person ever signs up again. Everything else is NULLed out.
 	_, err = tx.Exec(ctx, `
 		UPDATE users SET
 			name                = 'deleted_' || id::text || '@deleted.spotlight',
@@ -291,8 +345,6 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
  
-	// ── 3. Delete their registrations (as attendee) ───────────────────────────
-	// They shouldn't appear on other events' guest lists
 	_, err = tx.Exec(ctx,
 		`DELETE FROM event_registrations WHERE user_id = $1`, callerID,
 	)
@@ -301,7 +353,6 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
  
-	// ── 5. Delete OTP records ─────────────────────────────────────────────────
 	_, err = tx.Exec(ctx, `
 		DELETE FROM auth_otps
 		WHERE email = (
@@ -309,17 +360,14 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 		)
 	`, callerID)
 	if err != nil {
-		// Non-fatal
 		log.Printf("failed to delete OTPs for user %s: %v", callerID, err)
 	}
  
-	// ── 6. Commit ─────────────────────────────────────────────────────────────
 	if err := tx.Commit(ctx); err != nil {
 		http.Error(w, "failed to commit", http.StatusInternalServerError)
 		return
 	}
  
-	// ── 7. Delete avatar from R2 (after commit — non-fatal if it fails) ───────
 	if avatarURL != nil && h.R2 != nil {
 		key := h.R2.KeyFromURL(*avatarURL)
 		if key != "" {
